@@ -1,0 +1,91 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">Assembling Ordered Sets 集合的排序</h2><p>默认的情况下，SET 集合中的元组返回时的顺序就和它在集合定义时的一样。如果在使用 Members 函数时，元组返回的顺序就会和它们内部成员在层次结构中定义的顺序一样。</p><p>但是更多的时候，有可能需要返回的集合中元组的顺序有所不同，一些更加重要的数据就需要显示在最前面，因此就需要用到对集合排序的函数：</p><p>Order( {Set}, Expression [, Flag])</p><p>Order 函数根据表达式中返回的值对集合中的元组进行排序。</p><p>第一个参数是集合，第二个参数是排序的条件，第三个参数是排序的规则，有四个可选的值，默认情况下是升序排序。</p><p>示例一 – 未排序的默认情况下的查询</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{[Product].[Product].[Product].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19175131-e366b05e23674dbfb20f61ec87baa5e1.png"/></p><p>上图中 ROWS 轴上的 Product 成员是有序的，这个是在纬度设计的阶段就已经确认了的，所以查询出来的结果是按照默认顺序排列的。但是在实际业务查询中，更多的是对销售额进行排序。</p><p>示例二 – 使用Order函数对销售额进行排序 – 依赖第三方成员</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+ORDER(<br/>
+{[Product].[Product].[Product].Members},<br/>
+([Measures].[Reseller Sales Amount]),<br/>
+DESC<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19175220-0ab84cee9ba84793936c45472751defc.png"/></p><p>通过 Order 函数，集合中的每一个 Product 成员都通过表达式([Measures].[Reseller Sales Amount]) 进行了 DESC 降序排序。</p><p>示例三 – 使用 Order 函数进行排序 – 依赖第三方成员参与表达式运算的结果。</p><pre><code>WITH<br/>
+MEMBER [Measures].[Reseller Diff Internet ABS]<br/>
+AS VBAMDX!ABS(<br/>
+            ([Measures].[Reseller Sales Amount]) -<br/>
+            ([Measures].[Internet Sales Amount])<br/>
+            )<br/>
+SELECT<br/>
+{<br/>
+            ([Measures].[Reseller Sales Amount]),<br/>
+            ([Measures].[Internet Sales Amount]),<br/>
+            ([Measures].[Reseller Diff Internet ABS])<br/>
+} ON COLUMNS,<br/>
+ORDER(<br/>
+            {[Product].[Product].[Product].Members},<br/>
+            VBAMDX!ABS(<br/>
+            ([Measures].[Reseller Sales Amount]) -<br/>
+            ([Measures].[Internet Sales Amount])<br/>
+            ),<br/>
+            DESC<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19175336-6bc9eac8eb574cfcb46de7f1182e6058.png"/></p><p>可以看到这次排序既不是按照 Reseller Sales Amount 也不是按照 Internet Sales Amount 来排序，而是依据它们参与计算的表达式结果VBAMDX!ABS(([Measures].[Reseller Sales Amount]) -([Measures].[Internet Sales Amount])) 进行降序排序。</p><p>示例四 – 未归类的层次结构排序</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{[Product].[Subcategory].[Subcategory].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19175427-b0e689ca45c644858dede1d78892e99a.png"/></p><p>Subcategory 显示的是按照它们在层次结构中默认的顺序来呈现的，都是按照字母排序规则，加上 Category 再来看看，注意这时 Auto-Exists 又发挥了作用。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{[Product].[Category].[Category].Members}*<br/>
+{[Product].[Subcategory].[Subcategory].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19175604-c4d90ba9a6d44f05b9bddea246c06a51.png"/> </p><p>再来看基于这个组合的排序结果。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+ORDER(<br/>
+{[Product].[Category].[Category].Members} *<br/>
+{[Product].[Subcategory].[Subcategory].Members},<br/>
+([Measures].[Reseller Sales Amount]),<br/>
+DESC<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19175737-14d4a891944c402c9ba45a85a881ec71.png"/></p><p>很显然，基于对([Measures].[Reseller Sales Amount]) 的降序排序在这里可以看到受到了 Category 分类的影响，所有的排序都是按照 Category 归类之后再完成对 Product 的销售额进行的降序排序。</p><p>这是因为 DESC 和ASC 排序规则是基于层次结构的，为了打破层次结构的限制，可以使用Break-hierarchy flags – BASC和 BDESC。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Order(<br/>
+{[Product].[Category].[Category].Members} *<br/>
+{[Product].[Subcategory].[Subcategory].Members},<br/>
+([Measures].[Reseller Sales Amount]),<br/>
+BDESC<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19175828-633c9ecd92be475991591ce4a9a1946e.png"/></p><p>从查询的结果中看出这个排序是按照销售额进行排序的，通过对 Break-hierarchy sort 的使用，元组中的成员排序完全按照表达式的成员来完成。Break-hierarchy sort 在多成员元组的排序中会用到的比较多。</p><h2 id="articleHeader2">Hierarchize 函数的使用</h2><p>有时可以通过 Order 函数对一个比较复杂的集合进行排序，但是有时我们也希望返回的集合就按照组成元组的成员的默认顺序进行排序， 这时可以使用 Hierarchize 函数。</p><p>Hierarchize( {Set} [, POST])</p><p>Hierarchize 函数对指定的集合中元组的所有成员按照默认的顺序对它们进行排序。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Hierarchize(<br/>
+{<br/>
+            ([Product].[Product Categories].[Subcategory].[Road Bikes]),<br/>
+            ([Product].[Product Categories].[All Products]),<br/>
+            ([Product].[Product Categories].[Subcategory].[Mountain Bikes]),<br/>
+            ([Product].[Product Categories].[Category].[Bikes]),<br/>
+            ([Product].[Product Categories].[Subcategory].[Touring Bikes])<br/>
+}<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19175953-84f918616a514a0e861d6c2b674df459.png"/></p><p>当一个层次结构中的不同Level 中的成员在一起被处理时，高级别的成员会排在它们子成员的前面。</p><p>使用 POST 参数可以让子成员排在高级别成员的前面。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Hierarchize(<br/>
+{<br/>
+([Product].[Product Categories].[Subcategory].[Road Bikes]),<br/>
+([Product].[Product Categories].[All Products]),<br/>
+([Product].[Product Categories].[Subcategory].[Mountain Bikes]),<br/>
+([Product].[Product Categories].[Category].[Bikes]),<br/>
+([Product].[Product Categories].[Subcategory].[Touring Bikes])<br/>
+},<br/>
+POST<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19180031-ddbac5d88fd14872809ce2ac34209fea.png"/></p><h2 id="articleHeader3">Range Operator 范围操作符</h2><p>使用范围操作符可以用来操作一个已排序的集合，通过指定同一个层次结构中的两个成员作为开始和结束的参数，可以返回连同两个成员之间的其它所有成员来形成一个新的集合并返回。因为一般的层次结构都有默认的排序，所以大多数情况下可以直接使用。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{[Date].[Calendar].[CY 2001]:[Date].[Calendar].[CY 2004]} ON ROWS<br/>
+FROM [Step-by-Step]]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19180109-6405521fbdd24d6a8cf6641200a3d173.png"/></p><p>这样就取得从2001年到2004年间的Reseller Sales Amount。</p>
+</div>]
+</body>
+</html>

@@ -1,0 +1,391 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>在 CUBE 设计过程中有一个非常重要的点就是定义维度与度量值组关系，维度的创建一般在前，而度量值组一般来源于一个事实表。当维度和度量值组在 CUBE 中定义完成之后，下一个最重要的动作就是定义两者之间的关系。在前面几篇文章中也已经看到了如何将度量值组和维度通过哪些维度属性进行关联的操作，但是那些关联通常都是 Regular 类型的，属于直接的普通的关联。</p><p>但是实际上除了 Regular 之外，还有 Fact, Referenced, Many to Many 和 Data Mining(数据挖掘类不在此讨论)。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04140246-f10a2e83ea92401cad99c8e962fb421f.png"/></p><p>今天在这篇文章中讲解 Referenced 和 Fact 两种关系的定义。</p><h2 id="articleHeader2">测试代码</h2><pre><code><span style="color: rgb(0, 0, 255);">USE</span><span style="color: rgb(0, 0, 0);"> BIWORK_SSIS<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<span style="color: rgb(0, 0, 255);">SET</span> NOCOUNT <span style="color: rgb(0, 0, 255);">ON</span><br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">FactInternetSalesReason</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactInternetSalesReason <br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">FactInternetSales</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactInternetSales<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">FactResellerSales</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactResellerSales<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimEmployee</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimEmployee<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimDate</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimDate <br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimProduct</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimProduct <br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimSalesReason</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimSalesReason <br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimProductSubcategory</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimProductSubcategory<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimProductCategory</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimProductCategory<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimReseller</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimReseller <br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimCustomer</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimCustomer <br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimGeography</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimGeography <br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+  <br/>
+<span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimDate<br/>
+(<br/>
+    DateKey </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span><span style="color: rgb(0, 0, 0);">,<br/>
+    ShortDateName </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">12</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    FullDateName </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">20</span>)  <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">, <br/>
+    DayNumberOfWeek </span><span style="color: rgb(0, 0, 255);">TINYINT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    DayNameOfWeek </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">10</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    DayNumberOfMonth </span><span style="color: rgb(0, 0, 255);">TINYINT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    DayNumberOfYear </span><span style="color: rgb(0, 0, 255);">SMALLINT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">, <br/>
+    WeekNumberOfYear </span><span style="color: rgb(0, 0, 255);">TINYINT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    IsWeekend </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">7</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">, <br/>
+    IsLeapYear </span><span style="color: rgb(0, 0, 255);">BIT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    MonthKey </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    MonthNumberOfYear </span><span style="color: rgb(0, 0, 255);">TINYINT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    MonthNameOfYear </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">10</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    MonthNameWithYear </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">20</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">, <br/>
+    CalendarQuarterKey </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">, <br/>
+    CalendarQuarterNumber </span><span style="color: rgb(0, 0, 255);">TINYINT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">, <br/>
+    CalendarQuarterNameWithYear </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">20</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">, <br/>
+    CalendarSemesterNumber </span><span style="color: rgb(0, 0, 255);">TINYINT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    CalendarYearKey </span><span style="color: rgb(0, 0, 255);">SMALLINT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">, <br/>
+    CalendarYearName </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">20</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">, <br/>
+    FiscalQuarterKey </span><span style="color: rgb(0, 0, 255);">INT</span><span style="color: rgb(0, 0, 0);">,<br/>
+    FiscalQuarterNumber </span><span style="color: rgb(0, 0, 255);">TINYINT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">, <br/>
+    FiscalQuarterName </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">20</span><span style="color: rgb(0, 0, 0);">),<br/>
+    FiscalSemester </span><span style="color: rgb(0, 0, 255);">TINYINT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    FiscalYearKey </span><span style="color: rgb(0, 0, 255);">SMALLINT</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">, <br/>
+    FiscalYearName </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">20</span><span style="color: rgb(0, 0, 0);">),<br/>
+)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">DECLARE</span> <span style="color: rgb(0, 128, 0);">@StartDate</span> <span style="color: rgb(0, 0, 255);">DATETIME</span><br/>
+<span style="color: rgb(0, 0, 255);">DECLARE</span> <span style="color: rgb(0, 128, 0);">@EndDate</span> <span style="color: rgb(0, 0, 255);">DATETIME</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(0, 128, 0);">@StartDate</span> <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">2005-01-01</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+       </span><span style="color: rgb(0, 128, 0);">@EndDate</span> <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">2013-12-31</span><span style="color: rgb(255, 0, 0);">'</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">WHILE</span> (<span style="color: rgb(0, 128, 0);">@StartDate</span> <span style="color: rgb(128, 128, 128);">&lt;=</span> <span style="color: rgb(0, 128, 0);">@EndDate</span><span style="color: rgb(0, 0, 0);">)<br/>
+</span><span style="color: rgb(0, 0, 255);">BEGIN</span><br/>
+    <span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> DimDate <br/>
+    (<br/>
+        DateKey,<br/>
+        ShortDateName,<br/>
+        FullDateName, <br/>
+        DayNumberOfWeek,<br/>
+        DayNameOfWeek,<br/>
+        DayNumberOfMonth,<br/>
+        DayNumberOfYear, <br/>
+        WeekNumberOfYear,<br/>
+        IsWeekend,<br/>
+        IsLeapYear, <br/>
+        MonthKey,<br/>
+        MonthNumberOfYear,<br/>
+        MonthNameOfYear, <br/>
+        MonthNameWithYear,  <br/>
+        CalendarQuarterKey,<br/>
+        CalendarQuarterNumber,<br/>
+        CalendarQuarterNameWithYear,<br/>
+        CalendarSemesterNumber,<br/>
+        CalendarYearKey, <br/>
+        CalendarYearName,  <br/>
+        FiscalQuarterNumber, <br/>
+        FiscalSemester,<br/>
+        FiscalYearKey <br/>
+    )<br/>
+    </span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(255, 0, 255);">CAST</span>(<span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">8</span>),<span style="color: rgb(0, 128, 0);">@StartDate</span>,<span style="color: rgb(128, 0, 0); font-weight: bold;">112</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(0, 0, 255);">INT</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DateKey</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">20</span>), <span style="color: rgb(0, 128, 0);">@StartDate</span>,<span style="color: rgb(128, 0, 0); font-weight: bold;">106</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">ShortDateName</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">2</span>),<span style="color: rgb(255, 0, 255);">DATENAME</span>(DD,<span style="color: rgb(0, 128, 0);">@StartDate</span><span style="color: rgb(0, 0, 0);">)) <br/>
+                    </span><span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(255, 0, 0);">'</span> <br/>
+                    <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 255);">DATENAME</span>(MM,<span style="color: rgb(0, 128, 0);">@StartDate</span><span style="color: rgb(0, 0, 0);">) <br/>
+                    </span><span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(255, 0, 0);">'</span> <br/>
+                    <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">CHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">4</span>), <span style="color: rgb(255, 0, 255);">DATEPART</span>(YY,<span style="color: rgb(0, 128, 0);">@StartDate</span>)) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">FullDateName</span><span style="color: rgb(255, 0, 0);">'</span>, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> 1 July 2005  </span><br/>
+           <span style="color: rgb(255, 0, 255);">DATEPART</span>(DW,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DayNumberOfWeek</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 255);">DATENAME</span>(DW,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DayNameOfWeek</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 255);">DATENAME</span>(DD,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DayNumberOfMonth</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 255);">DATENAME</span>(DY,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DayNumberOfYear</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 255);">DATEPART</span>(WW,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">WeekNumberOfYear</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 255);">CASE</span> <span style="color: rgb(0, 0, 255);">WHEN</span> <span style="color: rgb(255, 0, 255);">DATEPART</span>(DW,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">IN</span> (<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>,<span style="color: rgb(128, 0, 0); font-weight: bold;">7</span><span style="color: rgb(0, 0, 0);">)  <br/>
+                    </span><span style="color: rgb(0, 0, 255);">THEN</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">Weekend</span><span style="color: rgb(255, 0, 0);">'</span><br/>
+                <span style="color: rgb(0, 0, 255);">ELSE</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">Weekday</span><span style="color: rgb(255, 0, 0);">'</span> <br/>
+           <span style="color: rgb(0, 0, 255);">END</span> <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">IsWeekend</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 255);">CASE</span> <span style="color: rgb(0, 0, 255);">WHEN</span> ((<span style="color: rgb(255, 0, 255);">YEAR</span>(<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">%</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">4</span> <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">0</span>) <span style="color: rgb(128, 128, 128);">AND</span> (<span style="color: rgb(255, 0, 255);">YEAR</span>(<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">%</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">100</span> <span style="color: rgb(128, 128, 128);">!=</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">0</span> <span style="color: rgb(128, 128, 128);">OR</span> <span style="color: rgb(255, 0, 255);">YEAR</span>(<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">%</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">400</span> <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">0</span><span style="color: rgb(0, 0, 0);">))<br/>
+                    </span><span style="color: rgb(0, 0, 255);">THEN</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">1</span><br/>
+                <span style="color: rgb(0, 0, 255);">ELSE</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">0</span><br/>
+           <span style="color: rgb(0, 0, 255);">END</span> <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">IsLeapYear</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">, <br/>
+           </span><span style="color: rgb(255, 0, 255);">DATEPART</span>(YY,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">100</span> <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 255);">DATEPART</span>(MM,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">MonthKey</span><span style="color: rgb(255, 0, 0);">'</span>, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> 200507</span><br/>
+           <span style="color: rgb(255, 0, 255);">DATEPART</span>(MM,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">MonthNumberOfYear</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 255);">DATENAME</span>(MM,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">MonthNameOfYear</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 255);">DATENAME</span>(MM,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">CHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">4</span>),<span style="color: rgb(255, 0, 255);">DATEPART</span>(YY,<span style="color: rgb(0, 128, 0);">@StartDate</span>)) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">MonthNameWithYear</span><span style="color: rgb(255, 0, 0);">'</span>,  <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> July 2005  </span><br/>
+           <span style="color: rgb(255, 0, 255);">DATEPART</span>(YY,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">100</span> <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 255);">DATEPART</span>(QQ,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">CalendarQuarterKey</span><span style="color: rgb(255, 0, 0);">'</span>,  <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> 200503</span><br/>
+           <span style="color: rgb(255, 0, 255);">DATEPART</span>(QQ,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">CalendarQuarterNumber</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">CY </span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">CHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">4</span>),<span style="color: rgb(255, 0, 255);">DATEPART</span>(YY,<span style="color: rgb(0, 128, 0);">@StartDate</span><span style="color: rgb(0, 0, 0);">)) <br/>
+                 </span><span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);"> Qtr </span><span style="color: rgb(255, 0, 0);">'</span> <br/>
+                 <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">CHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>), <span style="color: rgb(255, 0, 255);">DATEPART</span>(QQ,<span style="color: rgb(0, 128, 0);">@StartDate</span>)) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">CalendarQuarterNameWithYear</span><span style="color: rgb(255, 0, 0);">'</span>, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> CY 2005 Qtr 3  </span><br/>
+           <span style="color: rgb(255, 0, 255);">CASE</span> <span style="color: rgb(0, 0, 255);">WHEN</span> <span style="color: rgb(255, 0, 255);">DATEPART</span>(MM,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">BETWEEN</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">1</span> <span style="color: rgb(128, 128, 128);">AND</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">6</span><br/>
+                    <span style="color: rgb(0, 0, 255);">THEN</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">1</span><br/>
+                <span style="color: rgb(0, 0, 255);">ELSE</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">2</span><br/>
+           <span style="color: rgb(0, 0, 255);">END</span> <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">CalendarSemester</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 255);">DATEPART</span>(YY,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">CalendarYearKey</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,  <br/>
+           </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">CY </span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">CHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">4</span>),<span style="color: rgb(255, 0, 255);">DATEPART</span>(YY,<span style="color: rgb(0, 128, 0);">@StartDate</span>)) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">CalendarYearName</span><span style="color: rgb(255, 0, 0);">'</span>, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> CY 2005 </span><br/>
+           <span style="color: rgb(255, 0, 255);">CASE</span> <span style="color: rgb(0, 0, 255);">WHEN</span> <span style="color: rgb(255, 0, 255);">DATEPART</span>(MM,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">BETWEEN</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">1</span> <span style="color: rgb(128, 128, 128);">AND</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">6</span><br/>
+                     <span style="color: rgb(0, 0, 255);">THEN</span> <span style="color: rgb(255, 0, 255);">DATEPART</span>(QQ,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">2</span><br/>
+                <span style="color: rgb(0, 0, 255);">ELSE</span> <span style="color: rgb(255, 0, 255);">DATEPART</span>(QQ,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">-</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">2</span><br/>
+           <span style="color: rgb(0, 0, 255);">END</span> <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">FiscalQuarter</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 255);">CASE</span> <span style="color: rgb(0, 0, 255);">WHEN</span> <span style="color: rgb(255, 0, 255);">DATEPART</span>(MM,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">BETWEEN</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">1</span> <span style="color: rgb(128, 128, 128);">AND</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">6</span><br/>
+                    <span style="color: rgb(0, 0, 255);">THEN</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">2</span><br/>
+                <span style="color: rgb(0, 0, 255);">ELSE</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">1</span><br/>
+           <span style="color: rgb(0, 0, 255);">END</span> <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">FiscalSemester</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+           </span><span style="color: rgb(255, 0, 255);">CASE</span> <span style="color: rgb(0, 0, 255);">WHEN</span> <span style="color: rgb(255, 0, 255);">DATEPART</span>(MM,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">BETWEEN</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">1</span> <span style="color: rgb(128, 128, 128);">AND</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">6</span><br/>
+                    <span style="color: rgb(0, 0, 255);">THEN</span> <span style="color: rgb(255, 0, 255);">DATEPART</span>(YY,<span style="color: rgb(0, 128, 0);">@StartDate</span><span style="color: rgb(0, 0, 0);">) <br/>
+                </span><span style="color: rgb(0, 0, 255);">ELSE</span> <span style="color: rgb(255, 0, 255);">DATEPART</span>(YY,<span style="color: rgb(0, 128, 0);">@StartDate</span>) <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">1</span><br/>
+           <span style="color: rgb(0, 0, 255);">END</span> <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">FiscalYear</span><span style="color: rgb(255, 0, 0);">'</span> <br/>
+    <br/>
+           <span style="color: rgb(0, 0, 255);">UPDATE</span><span style="color: rgb(0, 0, 0);"> DimDate <br/>
+           </span><span style="color: rgb(0, 0, 255);">SET</span> FiscalQuarterKey <span style="color: rgb(128, 128, 128);">=</span> FiscalYearKey <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">100</span> <span style="color: rgb(128, 128, 128);">+</span> FiscalQuarterNumber,  <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> 200601</span><br/>
+               FiscalYearName <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">FY </span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">CHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">4</span>), FiscalYearKey),   <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> FY 2006</span><br/>
+               FiscalQuarterName <span style="color: rgb(128, 128, 128);">=</span>  <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">FY </span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">Char</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">4</span>), FiscalYearKey) <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);"> Qtr </span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">CHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>), FiscalQuarterNumber) <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> FY 2006 Qtr 1      </span><br/>
+           <span style="color: rgb(0, 0, 255);">WHERE</span> DateKey <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">INT</span>,<span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">8</span>),<span style="color: rgb(0, 128, 0);">@StartDate</span>,<span style="color: rgb(128, 0, 0); font-weight: bold;">112</span><span style="color: rgb(0, 0, 0);">))<br/>
+        <br/>
+    </span><span style="color: rgb(0, 0, 255);">SET</span> <span style="color: rgb(0, 128, 0);">@StartDate</span> <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(0, 128, 0);">@StartDate</span> <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">1</span><br/>
+<span style="color: rgb(0, 0, 255);">END</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> EmployeeKey,<br/>
+       ParentEmployeeKey,<br/>
+       EmployeeNationalIDAlternateKey,<br/>
+       </span><span style="color: rgb(255, 0, 255);">CASE</span> <span style="color: rgb(0, 0, 255);">WHEN</span> <span style="color: rgb(255, 0, 255);">ISNULL</span>(MiddleName,<span style="color: rgb(255, 0, 0);">''</span>) <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">''</span>  <span style="color: rgb(0, 0, 255);">THEN</span> FirstName <span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(0, 0, 0);"> LastName  <br/>
+            </span><span style="color: rgb(0, 0, 255);">ELSE</span> FirstName <span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(128, 128, 128);">+</span> MiddleName <span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(0, 0, 0);">LastName<br/>
+       </span><span style="color: rgb(0, 0, 255);">END</span> <span style="color: rgb(0, 0, 255);">AS</span><span style="color: rgb(0, 0, 0);"> FullName,<br/>
+       Title <br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> DimEmployee<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> AdventureWorksDW2012.dbo.DimEmployee<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> SalesReasonKey,<br/>
+       SalesReasonAlternateKey,<br/>
+       SalesReasonName,<br/>
+       SalesReasonReasonType<br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> DimSalesReason<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> AdventureWorksDW2012.dbo.DimSalesReason<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> SalesOrderNumber,<br/>
+       SalesOrderLineNumber,<br/>
+       SalesReasonKey<br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> FactInternetSalesReason<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> AdventureWorksDW2012.dbo.FactInternetSalesReason<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> ProductKey,<br/>
+       ProductAlternateKey,<br/>
+       ProductSubcategoryKey,<br/>
+       EnglishProductName,<br/>
+       StandardCost,<br/>
+       Color,<br/>
+       SafetyStockLevel,<br/>
+       ListPrice,<br/>
+       Class,<br/>
+       Size,<br/>
+       StartDate,<br/>
+       EndDate,<br/>
+       </span><span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);">Status</span><span style="color: rgb(255, 0, 0);">]</span><span style="color: rgb(0, 0, 0);">,<br/>
+       ProductAlternateKey </span><span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);"> (</span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 255);">CONVERT</span> (<span style="color: rgb(0, 0, 255);">Char</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">10</span>), StartDate, <span style="color: rgb(128, 0, 0); font-weight: bold;">120</span>) <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">)</span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(0, 0, 255);">AS</span><span style="color: rgb(0, 0, 0);"> ProductID<br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> DimProduct<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> AdventureWorksDW2012.dbo.DimProduct<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> ProductSubcategoryKey,<br/>
+       ProductSubcategoryAlternateKey,<br/>
+       EnglishProductSubcategoryName,<br/>
+       ProductCategoryKey <br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> DimProductSubcategory<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> AdventureWorksDW2012.dbo.DimProductSubcategory<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> ProductCategoryKey,<br/>
+       ProductCategoryAlternateKey,<br/>
+       EnglishProductCategoryName<br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> DimProductCategory<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> AdventureWorksDW2012.dbo.DimProductCategory <br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> ProductKey,<br/>
+       OrderDateKey,<br/>
+       EmployeeKey,<br/>
+       ResellerKey,<br/>
+       SalesOrderLineNumber,<br/>
+       SalesOrderNumber,<br/>
+       UnitPrice,<br/>
+       ProductStandardCost,<br/>
+       SalesAmount,<br/>
+       CarrierTrackingNumber,<br/>
+       CustomerPONumber,<br/>
+       SalesOrderNumber</span><span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">_</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(255, 0, 255);">CONVERT</span>(<span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">10</span>),SalesOrderLineNumber) <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">SalesOrderLineID</span><span style="color: rgb(255, 0, 0);">'</span><br/>
+<span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> FactResellerSales<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> AdventureWorksDW2012.dbo.FactResellerSales<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> ProductKey,<br/>
+       OrderDateKey,<br/>
+       DueDateKey,<br/>
+       ShipDateKey,<br/>
+       CustomerKey,<br/>
+       SalesOrderNumber,<br/>
+       SalesOrderLineNumber,<br/>
+       OrderQuantity,<br/>
+       UnitPrice,<br/>
+       SalesAmount<br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> FactInternetSales<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> AdventureWorksDW2012.dbo.FactInternetSales  <br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> GeographyKey, <br/>
+       City,<br/>
+       StateProvinceCode,<br/>
+       StateProvinceName,<br/>
+       CountryRegionCode,<br/>
+       EnglishCountryRegionName<br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> DimGeography <br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> AdventureWorksDW2012.dbo.DimGeography<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> CustomerKey,<br/>
+       GeographyKey,<br/>
+       CustomerAlternateKey,<br/>
+       Title,<br/>
+       </span><span style="color: rgb(255, 0, 255);">CASE</span> <span style="color: rgb(0, 0, 255);">WHEN</span> <span style="color: rgb(255, 0, 255);">ISNULL</span>(MiddleName,<span style="color: rgb(255, 0, 0);">''</span>) <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">''</span>  <span style="color: rgb(0, 0, 255);">THEN</span> FirstName <span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(0, 0, 0);"> LastName  <br/>
+            </span><span style="color: rgb(0, 0, 255);">ELSE</span> FirstName <span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(128, 128, 128);">+</span> MiddleName <span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(0, 0, 0);">LastName<br/>
+       </span><span style="color: rgb(0, 0, 255);">END</span> <span style="color: rgb(0, 0, 255);">AS</span><span style="color: rgb(0, 0, 0);"> CustomerName <br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> DimCustomer        <br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> AdventureWorksDW2012.dbo.DimCustomer<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> ResellerKey,<br/>
+       GeographyKey,<br/>
+       ResellerAlternateKey,<br/>
+       ResellerName<br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> DimReseller<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> AdventureWorksDW2012.dbo.DimReseller<br/>
+<br/>
+</span><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);">----------------------------------------------------------------------------</span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);"> Add Primary Key Constraint</span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);">----------------------------------------------------------------------------  </span><br/>
+<span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimEmployee <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_EmployeeKey <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span style="color: rgb(0, 0, 0);"> (EmployeeKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimSalesReason <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_SalesReasonKey <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span style="color: rgb(0, 0, 0);"> (SalesReasonKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimProduct <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_ProductKey <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span style="color: rgb(0, 0, 0);">(ProductKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimProductSubcategory <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_SubcategoryKey <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span style="color: rgb(0, 0, 0);">(ProductSubcategoryKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimProductCategory <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_CategoryKey <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span style="color: rgb(0, 0, 0);">(ProductCategoryKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimGeography <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_GeographyKey <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span style="color: rgb(0, 0, 0);">(GeographyKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimReseller <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_ResellerKey <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span style="color: rgb(0, 0, 0);">(ResellerKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimCustomer <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_CustomerKey <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span style="color: rgb(0, 0, 0);">(CustomerKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactInternetSales <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_InternetSales <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span style="color: rgb(0, 0, 0);">(SalesOrderNumber,SalesOrderLineNumber)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactResellerSales <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_ResellerSales <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span style="color: rgb(0, 0, 0);">(SalesOrderNumber,SalesOrderLineNumber)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactInternetSalesReason <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_InternetSalesReason <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span style="color: rgb(0, 0, 0);">(SalesOrderNumber,SalesOrderLineNumber,SalesReasonKey)<br/>
+</span><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);">----------------------------------------------------------------------------</span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);"> Add Primary Key Constraint</span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);">----------------------------------------------------------------------------</span><br/>
+<span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimCustomer<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Customer_GeographyKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(GeographyKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimGeography(GeographyKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimReseller<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Reseller_GeographyKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(GeographyKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimGeography(GeographyKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimEmployee<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Employee_ParentEmployeeKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(ParentEmployeeKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimEmployee(EmployeeKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactResellerSales<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Reseller_EmployeeKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(EmployeeKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimEmployee(EmployeeKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactResellerSales<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Reseller_ProductKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(ProductKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimProduct(ProductKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactResellerSales<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Reseller_OrderDateKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(OrderDateKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimDate(DateKey) <br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactResellerSales<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Reseller_ResellerKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(ResellerKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimReseller(ResellerKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactInternetSales<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Internet_ProductKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(ProductKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimProduct(ProductKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactInternetSales<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Internet_OrderDateKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(OrderDateKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimDate(DateKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactInternetSales<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Internet_ShipDateKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(ShipDateKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimDate(DateKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactInternetSales<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Internet_DueDateKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(DueDateKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimDate(DateKey) <br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactInternetSales<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Internet_CustomerKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(CustomerKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimCustomer(CustomerKey) <br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimProduct <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Product_SubcatetoryKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span> (ProductSubcategoryKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimProductSubcategory (ProductSubcategoryKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> DimProductSubcategory <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_Subcategory_CatetoryKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span> (ProductCategoryKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimProductCategory (ProductCategoryKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactInternetSalesReason <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_InternetSalesReason_Order <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span><span style="color: rgb(0, 0, 0);"> (SalesOrderNumber,SalesOrderLineNumber) <br/>
+</span><span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> FactInternetSales (SalesOrderNumber,SalesOrderLineNumber)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FactInternetSalesReason <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_InternetSalesReason_OrderReason <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span> (SalesReasonKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DimSalesReason (SalesReasonKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> DimEmployee <br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> DimDate <br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> DimProduct<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> DimProductSubcategory<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> DimProductCategory<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> DimCustomer<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> DimReseller<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> DimGeography<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> DimSalesReason<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> FactResellerSales<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> FactInternetSales<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> FactInternetSalesReason<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(0, 0, 255);">TOP</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">20</span><span style="color: rgb(0, 0, 0);"> <br/>
+       ProductKey,  </span><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> 产品 KEY</span><br/>
+       SalesOrderLineID, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> 订单明细编号</span><br/>
+       SalesOrderNumber, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> 订单编号</span><br/>
+       SalesOrderLineNumber, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> 订单详细编号</span><br/>
+       UnitPrice, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> 单位价格</span><br/>
+       ProductStandardCost, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> 标准成本</span><br/>
+       SalesAmount, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> 销售额</span><br/>
+       CarrierTrackingNumber, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> 承运人跟踪号,</span><br/>
+       CustomerPONumber <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> 采购订单号</span><br/>
+<span style="color: rgb(0, 0, 255);">FROM</span> FactResellerSales</code></pre><h2 id="articleHeader3">案例实现</h2><p>新建 SSIS 项目并创建数据源和数据源视图，在前面的几篇博客中已经讲到了 -</p><ul><li><a href="http://www.flybi.net/blog/biwork/1071"><u><font color="#0066cc">SSAS 系列 - 基于雪花模型的维度设计</font></u></a> - 主要已经处理了 DimProduct, DimProductSubcategory, DimProductCategory 这几张表。</li><li><a href="http://www.flybi.net/blog/biwork/572"><u><font color="#0066cc">SSAS 系列 - 自定义的日期维度设计</font></u></a> - 主要处理 DimDate 表。</li><li><a href="http://www.flybi.net/blog/biwork/1066"><u><font color="#0066cc">SSAS系列 - 关于父子维度的设计</font></u></a> - 主要处理 DimEmployee 表。</li><li><a href="http://www.flybi.net/blog/biwork/1072"><u><font color="#0066cc">SSAS 系列 - 实现Cube 以及角色扮演维度，度量值格式化和计算成员的创建</font></u></a> - 基于以上这些维度的度量值，角色扮演维度等概念。</li></ul><p>在这个数据源视图中，新加入了 DimCustomer, DimReseller, DimGeography , DimSalesReason, FactInternetSalesReason 这几个维度表。 </p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04203608-cae4c3d283794b6f8bd1cc9f88a5c468.png"/></p><p>那么现在假设我需要直接通过 Geography 地理纬度直接聚合访问 Reseller Sales 和 Internet Sales 度量值应该如何实现？</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04141155-25e45498516d4145bee66a9775708180.png"/></p><p>其实这个我们完全可以借鉴 <a href="http://www.flybi.net/blog/biwork/1071"><u><font color="#0066cc">SSAS 系列 - 基于雪花模型的维度设计</font></u></a> 这篇文章中的有关 Product Category, Product Subcategory, Product 这种层次结构的设计而应用到 DimGeography 和 DimCustomer 或者 DimGeography 和 DimReseller 的关系中，一样可以实现通过 Geography 直接聚合访问度量值。</p><p>但是今天我们将换一种方式来实现，直接通过定义维度和度量值关联的 Referenced 关系来实现。</p><p>先快速创建好 Geography, Customer 和 Reseller 这几个维度创建好，只有先创建好了维度才能定义与度量值组之间的关系。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04141626-0665515ea6074147b2b2edbfc827f1b6.png"/></p><p>Geography 层次结构。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04141637-34e36a4d2bbe49199237ce4c568d5ba8.png"/></p><p>Customer 维度非常简单，只包含了一个非键属性 Geography Key, Reseller 维度也是一样创建的。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04141646-82d3529244054a0ab8efead4febaef40.png"/></p><p>在多维数据集 Cube 的维度设计面板中选择添加新的维度 - Customer, Geography 和 Reseller。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04141706-64e2aefdba3d4745bdd25fbafd42bb08.png"/></p><p>根据数据源视图可以直接看到 FactInternetSales 和 FactResellerSales 是分别引用了 DimCustomer 的 CustomerKey 和 DimReseller 的 ResellerKey。所以当添加完这几个维度的时候，在维度用法中可以看到 Customer 维度和Reseller 维度是已经自动关联上了度量值组，并且它们之间的关系就是最简单的 Regular 关系。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04141658-3829a34b0dc34d8c924e3a6d01a6c886.png"/></p><p>可以观察数据源视图 FactInternetSales 是通过 DimCustomer 间接的关联到 DimGeography 上的，因此我们可以说：</p><p>度量值组 Internet Sales "引用了" Geography 维度，Internet Sales 的 "引用维度 Reference Dimension" 是 Geography。</p><p>是通过 “中间维度” Customer 维度引用的。</p><p>需要引用到"引用维度上的属性" Reference dimension attribute 是 GeographyKey。</p><p>通过"中间维度的属性" Intermediate dimension attribute 是 GeographyKey。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04142459-862922444a534c8385bd74cfb67b9252.png"/></p><p>编辑 Geography 和 Internet Sales 交叉的区域，定义它们之间的关联关系，在这里选择 Referenced 引用关系。</p><p>然后对照下面的操作完成关联，其实下面的这些关联动作就是实现了上述关联描述。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04141715-7b5f07703cd047e69a74043655df5573.png"/></p><p>Materialize 具体化 - 默认选项。它是指我们这种引用关系一旦被具体化，那么维度成员和事实数据之间的关联关系将成员多维数据集物理存储结构中的一部分。效率上是提高了，但是处理的时间可能会增多。 如果不选择具体化，那么每次查询的时候多维数据集需要根据中间维度关联到引用维度然后再计算聚合值，效率上会变得很低。因为此时，多维数据集的物理存储结构中将只会保存事实数据和中间维度的关联关系。</p><p>下图同样建立了 Reseller Sales 与 Reseller 维度之间的引用关联关系。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04141722-6e805f764e9643cd89fc3552d4c20a21.png"/></p><p>记住引用关联关系的图标，以后打开已有项目时通过图标就知道维度和度量值组是什么关联方式了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04141729-32daed9255f741aa92e5d8134d981692.png"/></p><p>部署并浏览数据，直接通过 Geography 维度来浏览 Internet Sales Amount 和 Reseller Sales Amount 度量值的数据。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04141736-de60f266c519449cacc347c722857101.png"/><br/><br/></p>
+</div>]
+</body>
+</html>

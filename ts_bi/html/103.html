@@ -1,0 +1,250 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>本章主要内容包括：</p><ol><li>解释各种不同的 MDX 导航函数的使用: Parent, Children, FirstChild, LastChild, Siblings, FirstSibling, LastSibling, RANK</li><li>通过导航函数定位层次结构中的成员: Ancestor, Ancestors, Ascendants, Decendants, Cousin</li><li>在层次结构中估算成员的位置: PrevMember, NextMember, Lag, Lead</li></ol><p>分析服务中的一个显著的特征就是在层次结构中组织成员。在一个给定的层次结构中，无论是属性层次结构还是用户自定义层次结构，每一个成员在特定的级别下都有一个精确的位置。它的位置主要由它与更高一级成员的关系和在同级别成员的顺序来决定的, 在层次结构中成员的这种位置的性质使得成员之间有了么某种关系，因此在 MDX 函数中可以通过导航很容易的定位到指定的成员。</p><h2 id="articleHeader2">Accessing Immediate Relatives 访问直属关系的成员</h2><p>层次结构中的成员关系经常被形容为家族关系，一个指定的成员，它的直接上层被称为父类成员，相对于这个父类成员来说当前成员是它的子类成员。一个成员作为父类可能有多个子类成员，子类成员之间就是这种 Sibling 兄弟的关系。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22165410-3e3aa540d5d7413088792c4bb1a4a6d8.png"/></p><p>MDX 中提供了很多函数可以定位和访问到给定成员的其它直属亲戚 。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22165433-e9f174007c3044b9a6d8a6d30b9fd125.png"/></p><p>通过在指定成员后跟上 Parent 函数来定位到父类成员。</p><pre><code>[Product].[Product Categories].[Subcategory].[Road Bikes].Parent</code></pre><p>由于父类函数本身就返回一个成员，因此可以在此基础上再继续使用其它的导航函数。这个例子中首先通过 Parent 函数定位到了 Road Bikes 的父类成员，接着通过 Children 函数定位到了这个父类成员下的所有子成员，这时返回的是一个集合。</p><pre><code>[Product].[Product Categories].[Subcategory].[Road Bikes].Parent.Children</code></pre><p>同样的子成员集合也可以通过 Siblings 函数来搞定，与上面的这种访问方式的效果都是一样的，但是应该采用这种更直接和间接的方法。</p><pre><code>[Product].[Product Categories].[Subcategory].[Road Bikes].Siblings</code></pre><p>直接看下面的这些例子，先查询出 Product Categories 下所有成员的 Reseller Sales Amount 的情况。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22165526-daef20787a43408996c52609ef9affc1.png"/></p><p>这个查询非常简单，Product Categories 层次结构中的成员沿着 ROWS 轴从层次结构中的多个 Level 级别中被抽取并呈现出来，Reseller Sales Amount 与 ROWS 轴上的每一个成员都进行了关联并展示着不同的 Sales Amount 值。</p><p>先来查看一下各个成员的父成员信息 - 使用 Parent 函数定位到父成员，通过 .Name 属性获取成员的名称。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22165543-eeeb5d96eb4941fc876048e20a3da9e8.png"/> </p><p>查看一下各个成员与父成员的 Reseller Sales Amount 比 -</p><pre><code>WITH<br/>
+MEMBER [Measures].[Parent Member] AS<br/>
+  [Product].[Product Categories].CurrentMember.Parent.Name<br/>
+MEMBER [Measures].[Parent Sales Amount] AS<br/>
+  ([Product].[Product Categories].CurrentMember.Parent,[Measures].  [Reseller Sales Amount])<br/>
+MEMBER [Measures].[Percent of Parent] AS<br/>
+  ([Measures].[Reseller Sales Amount])<br/>
+  /<br/>
+  (<br/>
+   [Product].[Product Categories].CurrentMember.Parent,<br/>
+   [Measures].[Reseller Sales Amount]<br/>
+  )<br/>
+,FORMAT="Percent"<br/>
+SELECT<br/>
+{<br/>
+   ([Measures].[Reseller Sales Amount]),<br/>
+   ([Measures].[Parent Member]),<br/>
+   ([Measures].[Parent Sales Amount]),<br/>
+   ([Measures].[Percent of Parent])<br/>
+} ON COLUMNS,<br/>
+{[Product].[Product Categories].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22165633-fb65d295478246c2bab175db950f951f.png"/></p><p>其中有出现类似于 1. #INF 情况，因为像  All Products 这个成员没有父成员，因此相当于除零。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22165651-d19e4e40d03544539c608cd64338f947.png"/></p><p>应该加上 if 判断来解决这个问题 - </p><pre><code>WITH<br/>
+MEMBER [Measures].[Parent Member] AS<br/>
+  [Product].[Product Categories].CurrentMember.Parent.Name<br/>
+MEMBER [Measures].[Parent Sales Amount] AS<br/>
+  ([Product].[Product Categories].CurrentMember.Parent,[Measures].  [Reseller Sales Amount])<br/>
+MEMBER [Measures].[Percent of Parent] AS<br/>
+   IIF(<br/>
+    [Product].[Product Categories].CurrentMember.Parent IS NULL,<br/>
+    NULL,<br/>
+    ([Measures].[Reseller Sales Amount])<br/>
+    /<br/>
+    (   <br/>
+     [Product].[Product Categories].CurrentMember.Parent,<br/>
+     [Measures].[Reseller Sales Amount]<br/>
+    )<br/>
+)<br/>
+,FORMAT="Percent"<br/>
+SELECT<br/>
+{<br/>
+  ([Measures].[Reseller Sales Amount]),<br/>
+  ([Measures].[Parent Member]),<br/>
+  ([Measures].[Parent Sales Amount]),<br/>
+  ([Measures].[Percent of Parent])<br/>
+} ON COLUMNS,<br/>
+{[Product].[Product Categories].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p>NULL 值是允许的，但是出现 Infinity Error 这种应该是要被避免的。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22165722-5b2d8a6ea5634b49a5360617a6c29784.png"/> </p><h2 id="articleHeader3">RANK 函数</h2><p>在之前的练习中，层次结构中的每一个成员都参与了父类成员度量值总和的统计。这种与父类成员百分比的比较非常直观，这种比较也经常会出现了成员与兄弟成员之间。</p><p>兄弟成员之间的比较通常会比较成员之间的排名，可以通过 MDX 的排名函数来实现：</p><p>Rank( Tuple, {Set} [, Expression] )</p><p>Rank 排名函数可以确定在元组集合中单个元组的位置，元组和集合分别是 RANK 函数中的前两个参数。第三个参数是可选的，提供了一个表达式主要是用来说明在执行排名搜索之前哪一个指定的集合是排序的(降序)。</p><ul><li>如果能够在集合中找到指定的元组，RANK 函数 将返回以 1 开始的这个元组在集合中的位置。如果没有找到指定的元组，那么就返回一个 0。</li><li>如果集合中的元组通过表达式参数实现了排序，并且有 多个元组通过计算得到同样的值的话，那么这些元组将被认定在集合中绑定在同一个位置，因此将得到同样的排名。在集合中随后的元组根据在它之前元组的序号计算并返回一个排名，这样可能因为有重复的排名而导致最终排名出现断序。</li></ul><p>下面的这个例子中， RANK 函数将用来返回在集合中的当前 Product Categories 成员在它所在集合中兄弟成员组成的集合中的位置，一定要记住的是兄弟成员函数包括了当前指定的成员。</p><p>在这个集合被搜索之前，分析服务首先根据 RANK 函数中的第三个参数也就是 Reseller Sales Amount 对集合中的每一个元组按照降序排序。</p><p>查询的结果可能看起来有点别扭，因为这个排序只是反映出当前成员在它的兄弟成员集合中的排名情况。如果需要从高到低进行排序，还需要修改一下 MDX 语句。</p><pre><code>WITH<br/>
+MEMBER [Measures].[Sibling Rank] AS<br/>
+  RANK(<br/>
+    [Product].[Product Categories].CurrentMember,<br/>
+    [Product].[Product Categories].CurrentMember.Siblings,<br/>
+    ([Measures].[Reseller Sales Amount])<br/>
+   )<br/>
+SELECT<br/>
+{<br/>
+   ([Measures].[Reseller Sales Amount]),<br/>
+   ([Measures].[Sibling Rank])<br/>
+} ON COLUMNS,<br/>
+{[Product].[Product Categories].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22165813-78e7332bc832409a9755fa4efeb3d3da.png"/></p><pre><code>WITH<br/>
+MEMBER [Measures].[Sibling Rank] AS<br/>
+Rank(<br/>
+  [Product].[Product Categories].CurrentMember,<br/>
+  [Product].[Product Categories].CurrentMember.Siblings,<br/>
+  ([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+SELECT<br/>
+{<br/>
+  ([Measures].[Reseller Sales Amount]),<br/>
+  ([Measures].[Sibling Rank])<br/>
+} ON COLUMNS,<br/>
+{<br/>
+Order(<br/>
+          {[Product].[Product Categories].Members},<br/>
+          ([Measures].[Sibling Rank]),<br/>
+          ASC<br/>
+        )<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22165826-7e0779d39c05482eb9094401ec5a3b78.png"/></p><p>从这个查询结果来看，成员 All Products 在它的兄弟集合中排名为 1，因为它之后一个成员。并且在 Category 这一个层级上，Bikes 也是排名为 1 ，它有几个其它的兄弟成员，比如说 Mountain Bikes 或者 Touring Bikes。 </p><h2 id="articleHeader4">访问旁系亲属 (Accessing Extended Relatives)</h2><p>就如同一个家族不仅仅有直系亲属，它也有很多旁系亲属，那么在 MDX导航中也并不局限于直接亲属。分析服务将家族式元素访问扩展到跨层次结构访问。一个给定成员的父类是许多其它向上扩展的祖先的根成员之一。相对于祖先来说，一个给定成员的后代和它自己更多个后代同时同一条线上的不同延伸。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22165901-00a02e81dd87410b8f283622ecc883a1.png"/></p><p>对应的有如下这些 MDX 函数用来访问一些旁系亲属。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22165913-817a392a77424cec90953f62663e7304.png"/></p><p>因为这几个导航的灵活程度更高一些，因此这几个导航函数理解起来也比较复杂一些。 </p><p>Ancestor (Member, Level | Distance) 如果指定了级别表达式，则 Ancestor 返回指定成员在指定级别处的祖先。如果指定成员与指定级别不在同一个层次结构中，就返回一个错误。 如果指定了距离，则 Ancestor 返回层次结构中比成员表达式高出指定步骤数的指定成员的祖先。可以将成员指定为属性层次结构的成员或用户定义层次结构的成员，有时还可以指定为父子层次结构的成员。数值 1 返回成员的父成员，数值 2 返回成员的祖父成员 (如果存在)，数值 0 返回成员本身。</p><p>Ancestors  和 Ancestor 的概念类似，只不过 在 SSAS 中 Ancestors 返回的是一个由单个成员构成的集合，因为在 SSAS 中不支持一个成员有多个父成员。</p><p>Ascendants (Member) - 返回从某一成员本身向上直到该成员的层次结构顶层的该成员的所有祖先；更具体来讲，它对指定成员的层次结构执行后序遍历，然后在集中返回与该成员相关的所有祖先成员，其中包括该成员本身。</p><p>Descendants( Member | {Set} [,Level | Distance [, Flag]])  - 返回在指定级别或距离上的后代集，可以选择包或不包括其他级别的后代。</p><ul><li>如果指定了级别， Descendants 函数将返回一个后代集，其中包含指定成员的后代或指定集成员的后代，这些后代处于所指定的级别，并且可以通过 Desc_Flag 中指定的标志来修改。</li><li>如果指定了 Distance，Descendants 函数将返回一个集，其中包含指定成员的后代或者指定集成员的后代，这些后代在指定成员的层次结构中与指定成员之间相距指定的级别数，并且可以通过  Desc_Flag 中指定的标志来修改。通常情况下，此函数与 Distance 参数一同用于处理不规则的层次结构。如果指定距离为零 0 ，该函数将返回仅由指定的成员或指定的成员集组成的集。</li><li>如果指定了集表达式，将针对该集中的每个成员分别解析 Descendants 函数，并重新创建该集。也就是说，Descendants 函数所使用的语法功能与 MDX Generate 函数相同。</li><li>如果未指定级别或距离，则通过为指定的成员（如果指定了成员）调用 level 函数 (&lt;&lt;Member&gt;&gt;.Level)，或通过为指定的集（如果指定了集）中的每个成员调用 Level 函数来确定该函数使用的级别默认值。 如果未指定级别表达式、距离或标志，此函数将在假定使用了以下语法的情况下执行操作：</li></ul><pre><code>Descendants<br/>
+(<br/>
+ Member_Expression ,<br/>
+ Member_Expression.Level ,<br/>
+ SELF_BEFORE_AFTER<br/>
+)</code></pre><p>如果指定了级别但未指定说明标志，此函数将在假定使用了以下语法的情况下执行操作：</p><pre><code>Descendants<br/>
+(<br/>
+  Member_Expression ,<br/>
+  Level_Expression,<br/>
+  SELF<br/>
+)</code></pre><p>Cousin (Member1, Ancestor Member2) - 返回在父成员下方与指定子成员具有相同的相对位置的子成员。</p><p> <img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170051-bd49387e6cc94f8b872717a14528e0f9.png"/></p><p>这个是成员，级别以及一些标志的关系图。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170132-79446d5bec6a44b59aefa274c6da6758.png"/></p><p>前面看了那么多，后面直接来看一些例子吧！</p><pre><code>WITH<br/>
+MEMBER [Measures].[Percent of Parent] AS<br/>
+IIF(<br/>
+   [Product].[Product Categories].CurrentMember.Parent IS NULL,<br/>
+   NULL,<br/>
+   ([Measures].[Reseller Sales Amount])/<br/>
+   (<br/>
+      [Product].[Product Categories].CurrentMember.Parent,<br/>
+      [Measures].[Reseller Sales Amount]<br/>
+   )<br/>
+)<br/>
+,FORMAT="Percent"<br/>
+SELECT<br/>
+{<br/>
+   ([Measures].[Reseller Sales Amount]),<br/>
+   ([Measures].[Percent of Parent])<br/>
+} ON COLUMNS,<br/>
+{<br/>
+   [Product].[Product Categories].Members<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p> 这个例子查询 Product Category 层次结构中的成员与父类成员的  Reseller Sales Amount 比。</p><p> <img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170153-2b28dbcf049e4f658514d051b4c9d4a7.png"/></p><p>上面的这种写法并没有什么问题，但是像 Accessories 这种属于 Category 级别的如果不需要去看它占父类的比例的话，我们应该限定最高的一个级别就是 Category。</p><pre><code>WITH<br/>
+MEMBER [Measures].[Percent of Parent] AS<br/>
+IIF(<br/>
+     [Product].[Product Categories].CurrentMember.Parent Is Null,<br/>
+     Null,<br/>
+     ([Measures].[Reseller Sales Amount])/<br/>
+     (<br/>
+       [Product].[Product Categories].CurrentMember.Parent,<br/>
+       [Measures].[Reseller Sales Amount]<br/>
+     )<br/>
+)<br/>
+,FORMAT="Percent"<br/>
+MEMBER [Measures].[Percent of Category] AS<br/>
+IIF(<br/>
+     Ancestor(<br/>
+         [Product].[Product Categories].CurrentMember,<br/>
+         [Product].[Product Categories].[Category]<br/>
+     ) Is Null,<br/>
+     Null,<br/>
+    ([Measures].[Reseller Sales Amount])/<br/>
+    (<br/>
+       Ancestor(<br/>
+                    [Product].[Product Categories].CurrentMember,<br/>
+                    [Product].[Product Categories].[Category]<br/>
+                  ),<br/>
+                [Measures].[Reseller Sales Amount]<br/>
+     )<br/>
+)<br/>
+,FORMAT="Percent"<br/>
+SELECT<br/>
+{<br/>
+   ([Measures].[Reseller Sales Amount]),<br/>
+   ([Measures].[Percent of Parent]),<br/>
+   ([Measures].[Percent of Category])<br/>
+} ON COLUMNS,<br/>
+{[Product].[Product Categories].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p>可以看到 Category 这个级别就是最高级别了，因此 Accessories 这个就是 100%了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170214-28cc78f8fa8d40be949862a1e8ee7f3e.png"/></p><p>Calculate a product’s percent contribution across its lineage 沿着血缘关系计算 Product 百分比贡献</p><p>先查询一下 Product 级别下 [Mountain-200 Black, 42] 成员的 Reseller Sales Amount 值。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{([Product].[Product Categories].[Product].[Mountain-200 Black, 42])} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170236-57e06e46ac24470d876767895a733ac6.png"/></p><p>但是有时也很喜欢不光看到这个具体的产品，而且还喜欢看到这个产品属于哪一个子类，哪一个大类，这些信息都需要。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+HIERARCHIZE({<br/>
+   Ascendants(<br/>
+    [Product].[Product Categories].[Product].[Mountain-200 Black, 42]<br/>
+   )<br/>
+}) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p>因此通过 Ascendants 可以看到这个产品及它所有父类成员的 Reseller Sales Amount。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170251-8546cde8e2a44828bed56b1d462a0714.png"/></p><p>还可以计算一下这个产品在各个父类层级所占有的百分比。</p><pre><code>WITH MEMBER [Measures].[Mountain-200 Black 42 in Parent]<br/>
+AS<br/>
+([Product].[Product Categories].[Product].[Mountain-200 Black, 42],<br/>
+ [Measures].[Reseller Sales Amount])<br/>
+ /<br/>
+ ([Product].[Product Categories].CurrentMember,[Measures].[Reseller Sales Amount])<br/>
+,FORMAT = "Percent"<br/>
+SELECT<br/>
+{([Measures].[Reseller Sales Amount]),<br/>
+([Measures].[Mountain-200 Black 42 in Parent])}<br/>
+ON COLUMNS,<br/>
+   HIERARCHIZE({<br/>
+           Ascendants(<br/>
+              [Product].[Product Categories].[Product].[Mountain-200 Black, 42]<br/>
+           )<br/>
+}) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170315-f8af8527bb7d4510b96aaa52a4ac33fd.png"/></p><p>Assemble the set of descendants for a given category 搞定指定 Category 下的子孙们</p><p>先查询一下 Bikes 这个分类上的  Reseller Sales Amount 值。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{[Product].[Product Categories].[Category].[Bikes]} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170548-abff3c1febfc43bea675cf01b10fcab6.png"/></p><p>如果想查看 [Product].[Product Categories].[Category].[Bikes] 这个成员在 [Product].[Product Categories].[Subcategory] 级别上有哪些子成员的话，可以使用 Descendants 函数来查询。 比如说 [Product].[Product Categories].[Category].[Bikes] 是张三的话， [Product].[Product Categories].[Subcategory] 相当于指定了一个级别，比如说是儿子，那么就是把张三的儿子这个级别上的成员全部提取出来形成一个集合，说简单一点就是把张三的儿子们全都查出来。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Descendants(<br/>
+   {[Product].[Product Categories].[Category].[Bikes]},<br/>
+   [Product].[Product Categories].[Subcategory]<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170610-e5131d8c10364f71a7f712ba3cdc0ea7.png"/></p><p>把这个例子修改一下，这次变成查询 Product 了，也就是查询张三的孙子们了。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Descendants(<br/>
+  {[Product].[Product Categories].[Category].[Bikes]},<br/>
+  [Product].[Product Categories].[Product],<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170630-4d63a3a7d82f4b9e92d7b75d6ec19b5f.png"/></p><p>那么有一个问题，能不能在只定义 儿子的级别上去查查张三的孙子，或者在只定义孙子的级别上去查查张三的儿子们？ 还是回头再看看这幅图 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170646-28d090a4e54c40f2b2a330f9e72f0b0a.png"/></p><p>Descendants (Member, Level, Flag) 中，Member 是张三，指定的级别默认情况下并没有添加 Flag 标志，但是在添加了 Flag 标志之后就可以上下移动了。</p><p>我们来看，在张三的儿子这个级别上去查查张三的孙子，自然 Level 应该在儿子的级别上往下移动，添加一个 After 标志即可。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Descendants(<br/>
+   {[Product].[Product Categories].[Category].[Bikes]},<br/>
+   [Product].[Product Categories].[Subcategory],<br/>
+   AFTER<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170715-5c99808ad1784ea7bb4220b0f9e7fe41.png"/></p><p>那么在张三孙子的级别上来看看儿子们，就需要往上移动，使用 BEFORE 即可。当然要注意这里 Bikes 本身也可以被查询出来，因为这里的 Descendants 表明的是一个范围，从哪里到哪里的一个范围并不是只在一个级别上查询。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Descendants(<br/>
+   {[Product].[Product Categories].[Category].[Bikes]},<br/>
+   [Product].[Product Categories].[Product],<br/>
+   BEFORE<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170737-4b068d7ceb3b46daabad58b347aa77a8.png"/></p><p>比如在儿子的级别上去查询孙子，但是又想查询自己，这时就可以使用 BEFORE_AND_AFTER 。先定位到级别，然后从级别这个角度去看 Before 和 After。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Descendants(<br/>
+  {[Product].[Product Categories].[Category].[Bikes]},<br/>
+  [Product].[Product Categories].[Subcategory],<br/>
+  BEFORE_AND_AFTER<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><h2 id="articleHeader5">调查层次结构中的成员 Investigating Members in a Hierarchy </h2><p>可以通过下面的几个小函数来判断在层次结构上某些成员的位置特征。</p><p>IsSibling(Member_Expression1, Member_Expression2) - 返回一个指定成员是否是另一个指定成员的同级。</p><p>IsAncestor(Member_Expression1, Member_Expression2) - 返回一个指定成员是否是另一个指定成员的祖先。</p><p>IsLeaf(Member_Expression) - 判断指定成员是否是叶成员。</p><pre><code>WITH<br/>
+MEMBER [Measures].[Number of Children] AS<br/>
+IIF(<br/>
+  IsLeaf([Product].[Product Categories].CurrentMember),<br/>
+   "N/A",<br/>
+   COUNT(<br/>
+   [Product].[Product Categories].CurrentMember.Children<br/>
+   )<br/>
+)<br/>
+SELECT<br/>
+{[Measures].[Number of Children]} ON COLUMNS,<br/>
+{[Product].[Product Categories].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p>这个例子判断当前成员是否是叶成员，如果不是就计算它的子成员的数量。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170829-efe5c4b4a8ca4fbebf571f092cdcb190.png"/></p><h2 id="articleHeader6">Navigating within a Level 级别内导航</h2><ol><li>PrevMember - 返回指定成员所在级别的上一个成员。</li><li>NextMember - 返回指定成员所在级别上的下一个成员。</li><li>Lag - 返回在成员级别中比指定成员位置靠前且靠前位数为指定位数的成员。</li><li>Lead - 返回在成员级别中比指定成员位置靠后且靠后位数为指定位数的成员。</li></ol><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{[Date].[Calendar].[Month].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170914-3e4f1336854549a2bd6ec9a58ac24726.png"/></p><p>新增加一列，当前成员的前一个成员的 Reseller Sales Amount 以及它们之间的差额。</p><pre><code>WITH<br/>
+MEMBER [Measures].[Prior Period Reseller Sales] AS<br/>
+(<br/>
+   [Date].[Calendar].CurrentMember.PrevMember,<br/>
+   [Measures].[Reseller Sales Amount]<br/>
+)<br/>
+,FORMAT="Currency"<br/>
+MEMBER [Measures].[Change in Reseller Sales] AS<br/>
+   ([Measures].[Reseller Sales Amount]) - ([Measures].[Prior Period Reseller Sales])<br/>
+,FORMAT="Currency"<br/>
+SELECT<br/>
+{<br/>
+   ([Measures].[Reseller Sales Amount]),<br/>
+   ([Measures].[Prior Period Reseller Sales]),<br/>
+   ([Measures].[Change in Reseller Sales])<br/>
+} ON COLUMNS,<br/>
+{[Date].[Calendar].[Month].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/22170927-dd92fe8d72554e81a30745820a2632b4.png"/></p>
+</div>]
+</body>
+</html>

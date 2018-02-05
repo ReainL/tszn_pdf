@@ -1,0 +1,48 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>SSRS 中并没有直接提供本地化的配置方式，因此在 SSRS 中实现本地化，比如有英文标题还有可选的中文标题，就需要通过其它的方式来解决。</p><p>比如默认是这样的英文标题 -</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032217370429483.png"/></p><p>但是本地中方用户可能比较喜欢看到这样的标题 -</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032218457079562.png"/></p><p>我们可以通过以下变通的方式来实现。</p><h2 id="articleHeader2">实现过程</h2><p>创建一张翻译表，这张翻译表将配置所有需要本地化的中文和英文标签。</p><pre><code><span style="font-family: Microsoft Yahei; font-size: 12px;"><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);">------------------------------------------------------------------------</span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);"> http://www.cnblogs.com/biwork</span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);">------------------------------------------------------------------------</span><br/>
+<span style="color: rgb(0, 0, 255);">USE</span> BIWORK_SSIS<br/>
+<span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">dbo.TRANSLATION</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span> dbo.TRANSLATION <br/>
+<span style="color: rgb(0, 0, 255);">GO</span> <br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">TABLE</span> dbo.TRANSLATION<br/>
+(<br/>
+    ID <span style="color: rgb(0, 0, 255);">INT</span>,<br/>
+    LANGUAGE_TYPE <span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">25</span>),<br/>
+    LANGUAGE_DESC <span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>)<br/>
+    <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> <span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);">PK_TRANSLATION</span><span style="color: rgb(255, 0, 0);">]</span> <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span>(ID,LANGUAGE_TYPE)<br/>
+)<br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">INTO</span> dbo.TRANSLATION <span style="color: rgb(0, 0, 255);">VALUES</span><br/>
+(<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">en-US</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">Employee ID</span><span style="color: rgb(255, 0, 0);">'</span>),<br/>
+(<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">zh-CN</span><span style="color: rgb(255, 0, 0);">'</span>,N<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">员工 ID</span><span style="color: rgb(255, 0, 0);">'</span>),<br/>
+(<span style="color: rgb(128, 0, 0); font-weight: bold;">2</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">en-US</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">Full Name</span><span style="color: rgb(255, 0, 0);">'</span>),<br/>
+(<span style="color: rgb(128, 0, 0); font-weight: bold;">2</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">zh-CN</span><span style="color: rgb(255, 0, 0);">'</span>,N<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">名称</span><span style="color: rgb(255, 0, 0);">'</span>),<br/>
+(<span style="color: rgb(128, 0, 0); font-weight: bold;">3</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">en-US</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">Title</span><span style="color: rgb(255, 0, 0);">'</span>),<br/>
+(<span style="color: rgb(128, 0, 0); font-weight: bold;">3</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">zh-CN</span><span style="color: rgb(255, 0, 0);">'</span>,N<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">职位</span><span style="color: rgb(255, 0, 0);">'</span>)<br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span> ID,<br/>
+       LANGUAGE_TYPE,<br/>
+       LANGUAGE_DESC<br/>
+<span style="color: rgb(0, 0, 255);">FROM</span> dbo.TRANSLATION</span></code></pre><p>注意上面的主键部分，是 ID 和 LANGUAGE_TYPE 共同组成。 en-US 英文，zh-CN 中文</p><p><img alt="" height="433" src="http://images.cnitblog.com/i/477275/201403/032224342869822.png" width="945"/></p><p>报表默认的语言我们可以看看 SSRS Report 的内置字段 Language - 把这个字段拖放到报表上然后预览一下看看，我的默认的就是 en-US，后面会用到这个内置字段。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032227059557192.png"/></p><p>创建一个 DataSet - DS_LABELS, 在 BIDS 工具中，如果在查询时写好了这个参数，创建完 DataSet后，这个参数就会被直接创建出来，不需要预先定义。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032240289385675.png"/></p><p>再创建一个 Dataset - DS_LANGUAGES 用来作为报表上的语言参数 -</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032241029667300.png"/></p><p>同时给 @LANGUAGE 变量赋值可用的值 -</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032241399058885.png"/></p><p>Default Value 也可以像上面一样选中 DS_LANGUAGES 来给定值，当然也可以让这个参数在显示的时候按照报表自身的默认语言来显示，使用 Build-In 内置字段。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032242500096736.png"/></p><p>还要再创建一个隐藏的可多选的参数 - LABELS</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032246254025041.png"/></p><p>可用的值 -</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032246405551437.png"/></p><p>默认值 -</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032246521187903.png"/></p><p>在报表区域右键属性，然后在 Code 里添加一段 VB 代码 -</p><pre><code><span style="font-family: Microsoft Yahei; font-size: 12px;"><span style="color: rgb(0, 0, 255);">Public</span> <span style="color: rgb(0, 0, 255);">Function</span> GetLabel(P <span style="color: rgb(0, 0, 255);">as</span> Parameter, Label <span style="color: rgb(0, 0, 255);">as</span> <span style="color: rgb(0, 0, 255);">String</span>) <span style="color: rgb(0, 0, 255);">as</span> <span style="color: rgb(0, 0, 255);">String</span><br/>
+    <span style="color: rgb(0, 0, 255);">Dim</span> i <span style="color: rgb(0, 0, 255);">As</span> <span style="color: rgb(0, 0, 255);">Integer</span><br/>
+    <br/>
+    <span style="color: rgb(0, 0, 255);">For</span> i = <span style="color: rgb(128, 0, 128);">0</span> <span style="color: rgb(0, 0, 255);">to</span> <span style="color: rgb(0, 0, 255);">Ubound</span>(P.Value)<br/>
+       <span style="color: rgb(0, 0, 255);">If</span> (P.Value(i) = Label) <span style="color: rgb(0, 0, 255);">Then</span> <span style="color: rgb(0, 0, 255);">Return</span> P.Label(i)<br/>
+    <span style="color: rgb(0, 0, 255);">Next</span> i<br/>
+<span style="color: rgb(0, 0, 255);">Return</span> Label<br/>
+<span style="color: rgb(0, 0, 255);">End Function</span></span></code></pre><p>这段代码的作用就是将参数 LABELS 对象(注意第一个参数的类型是 Parameter) 传入，然后循环遍历这个参数对象的所有 VALUE 值，如果某一个 VALUE 值即表中的 ID 列正好等于第二个参数的值，那么就将这个参数的 VALUE 所对应的 LABEL 返回。</p><p>这个代码是最核心的代码！</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032253178541346.png"/></p><p>好了，这样就可以在页面上根据数据翻译表中的 ID 来获取对应的 LABEL 了。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032257456603432.png"/></p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032257103425605.png"/></p><p>需要的地方全都修改，并指定相应的 ID。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032259026181675.png"/></p><p>预览报表，可以根据相应的语言查看报表。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201403/032259339077569.png"/></p><p>在网上看到不止这一种解决方法，也有使用自定义的 Code 来解决的，但我认为这种方式还是相对要容易管理一些，并且所有的标签内容在数据库表中进行管理，很方便。</p><p>当然，在实际使用的时候要考虑到可重用性，也就是说不同的报表中字段，标签名称相同的情况下应该使用同一个标签而不应该重复创建字段。因此在检查字段标签是否重复存在的时候可以对 LANGUAGE_DESC 进行排序然后检查。</p><p>并且，如果为了更好的管理报表的标签的话，应该再增加一个Report表和ReportLabel表。即需要知道哪些报表使用了哪些标签，这样一来就可以根据报表名称快速排查哪些标签被使用了，要改的时候也知道要改哪些标签。<br/></p>
+</div>]
+</body>
+</html>

@@ -1,0 +1,64 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h3 id="articleHeader1" style="margin-left: 0px;">开篇介绍</h3><p>在数据流中， Script Component 中的 Transformation 类型不仅可以实现同步转换功能，并且还可以实现异步转换功能。所谓同步转换，即在从上游数据行传递给 Script Component 的时候，是每传入一行处理一行再往下输出一行。异步转换一般是需要接受到来自上游的所有行，处理之后再往下输出。但是，异步转换也分为完全阻塞和非完全阻塞，对于异步转换控件比如 Sort, Aggregate 就是异步的完全阻塞转换控件。而 Script Component 异步 Transformation 是一个半阻塞的转换组件，也接受一部分数据的同时，可能也会向下输出一部分（这取决于它自身的内部实现，我们无法深入了解深层次的设计），这时可以通过观察得出来的结论。</p><p> </p><p>下面用 Script Component 异步转换 (Asynchrounous Transformation) 来演示如何处理一个不规则的文件的。</p><h3 id="articleHeader2" style="margin-left: 0px;">Script Component - Transformation, Asynchrounous</h3><p>跟上一篇文章的数据源一样，也是将不规则的文件正行数据当作一个列来使用。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061934487338160.png"/></p><p>还是拖放一个 Script Component，类型选择 Transformation 转换。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061934581239025.png"/></p><p>编辑 Script Component，Input 输入还是 EMPLOYEE。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061935072648731.png"/></p><p>两个 Output 输出的配置和上一篇文章还是一样的，唯一的区别就是这里的两个 Output 都是异步的，因为不绑定到任何一个 Input。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061935156555769.png"/></p><p>回到 Script 代码部分，通过简单的 Message 观察一下各默认方法调用和执行的顺序。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061935318262729.png"/></p><p>第一个还是和之前几篇文章提到的一样，仍然是 PreExecute() 方法被调用。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061936169209250.png"/></p><p>这个方法可以用来创建 Output 输出。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061936262808359.png"/></p><p>中间有多少行这个方法就会被调用多少次。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061936328117996.png"/></p><p>最后一个是 PostExecute() 方法的调用，但是由于行数太多就不等待截图了，直接结束演示。</p><p> </p><p>仅仅是这样，我们可以从上面看到数据流在经过 Script Component 的时候仍然是以行为单位执行并往下输出的，ProcessInputRow() 是用来处理行的。</p><p>在代码中加入一个方法，很明显是一个重写的方法。注意到这里是 ProcessInput，参数仍然是一样的类型：</p><pre><code> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">public</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">override</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">void</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> Input0_ProcessInput(Input0Buffer Buffer)<br/>
+ {<br/>
+      MessageBox.Show(</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">Input0_ProcessInput()</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">);    <br/>
+ }</span></code></pre><p style="margin-left: auto;">再次执行包的时候，PreExecute() 仍然是第一个执行，并且只会执行一次。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061936386236722.png"/></p><p>这个方法也被调用到了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061936449981874.png"/></p><p>新写入的方法被调用的同时，注意看这里的方法，ProcessInput() 方法被调用的时候，这时 293 行数据全部进入到 Script Component 中。（在当前代码中，这个方法被调用了两次）</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061936511552327.png"/></p><p>并且紧接着 PostExecute() 方法被调用了，表示数据流处理结束了，但要注意到 Process Input Row() 方法此时并未被调用到。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061936590303221.png"/></p><p>首先要理解一下 Input0_ProcessInput(Input0Buffer Buffer) 方法，这个方法被执行的时候实际上 Input 输入源中所有的数据行就已经进入到 Script Component 中了。并且当我们在脚本中显示的重写这个方法的时候，Input0_ProcessInputRow(Input0Buffer Row) 将不再被执行。并且从参数命名上来看，前者是 Buffer，后者是 Row 尽管类型是一致的，但是实则在参数命名上就已经提醒了我们 - <span style="color: rgb(255, 0, 0);"><strong>前者中的 Buffer 是整个所有的数据行，而后者的 Row 仅仅是包装了每次进入到后者方法中的一行记录，这就是最大的区别。</strong></span></p><p> </p><p>因此，我们可以通过在 ProcessInput() 中循环遍历 Buffer 并每次循环读取一行就可以实现遍历 Buffer 中的所有数据行了。</p><pre><code> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">public</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">override</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">void</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> Input0_ProcessInput(Input0Buffer Buffer)<br/>
+    {<br/>
+        </span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">string</span> fileCreatedDate=<span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">""</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">; <br/>
+        </span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">string</span> line = <span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">""</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">;<br/>
+<br/>
+        </span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">while</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> (Buffer.NextRow())<br/>
+        {<br/>
+            line </span>=<span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> Buffer.EMPLOYEE;<br/>
+<br/>
+            </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">//</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> 如果行以  FILE CREATED DATE 开始</span><br/>
+            <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">if</span>(line.StartsWith(<span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">FILE CREATED DATE</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">))<br/>
+            {<br/>
+                </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">//</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> 则只取文件日期部分</span><br/>
+                fileCreatedDate = line.Substring(<span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">19</span>, <span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">10</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">); <br/>
+            }<br/>
+            </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">//</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> 如果达到第二行</span><br/>
+            <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">else</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">if</span> (line.StartsWith(<span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">TOTAL EMPLOYEES</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">))<br/>
+            {<br/>
+                </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">//</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">MessageBox.Show(line.Substring(16, 10));<br/>
+                </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">//</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">MessageBox.Show(line.Substring(15, 10));<br/>
+                </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">//</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> 创建一个新的输出 Buffer ，并在这个输出中将日期和员工条数取出来放入到 Buffer 中。</span><br/>
+<span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">                FILEMESSAGEBuffer.AddRow();<br/>
+                FILEMESSAGEBuffer.FILECREATEDDATE </span>=<span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> fileCreatedDate;<br/>
+                FILEMESSAGEBuffer.TOTALEMPLOYEES </span>= <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">int</span>.Parse(line.Substring(<span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">16</span>, <span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">10</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">));<br/>
+            }<br/>
+            </span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">else</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">if</span> (line.StartsWith(<span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">*</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">))<br/>
+            {<br/>
+                </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">//</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">不做处理</span><br/>
+<span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">            }<br/>
+            </span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">else</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"><br/>
+            {<br/>
+                </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">//</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> 剩下的部分是主体内容部分，直接按照固定的列位置描述截取字符串</span><br/>
+<span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">                EMPLOYEEBuffer.AddRow();<br/>
+                EMPLOYEEBuffer.NAME </span>= line.Substring(<span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">0</span>, <span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">50</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">);<br/>
+                EMPLOYEEBuffer.POSITION </span>= line.Substring(<span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">50</span>, <span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">50</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">);<br/>
+                EMPLOYEEBuffer.HIREDDATE </span>= line.Substring(<span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">100</span>, <span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">12</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">);<br/>
+                EMPLOYEEBuffer.BIRTHDATE </span>= line.Substring(<span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">112</span>, <span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">12</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">);<br/>
+                EMPLOYEEBuffer.EMAIL </span>= line.Substring(<span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">124</span>, <span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">50</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">);<br/>
+                EMPLOYEEBuffer.PHONE </span>= line.Substring(<span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">174</span>, <span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">25</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">);<br/>
+                EMPLOYEEBuffer.MARRIAGE </span>= line.Substring(<span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">199</span>, <span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">1</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">) ; <br/>
+            }<br/>
+<br/>
+        }<br/>
+<br/>
+        </span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">if</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> (Buffer.EndOfRowset())<br/>
+        {<br/>
+            FILEMESSAGEBuffer.SetEndOfRowset();<br/>
+            EMPLOYEEBuffer.SetEndOfRowset();<br/>
+        }  <br/>
+    }</span></code></pre><p style="margin-left: auto;">执行包。（可以通过断点调试查看 Script 中方法的调用顺序）<br/><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061947176704988.png"/></p><p style="margin-left: auto;">查看结果，这样的一个不规则文件也就处理好了。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201412/061947339362919.png"/></p><p>把文件数据量加大，其实就会发现当上游文件往下输出时候，已经有一部分数据已经在往下输出了。所以可以看出来，这里的异步是半阻塞控件。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062303065303880.png"/></p>
+</div>]
+</body>
+</html>

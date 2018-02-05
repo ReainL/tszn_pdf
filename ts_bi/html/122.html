@@ -1,0 +1,23 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<p>FORMAT_STRING 属性在处理计算成员（通常是度量值成员）的时候会经常使用到，比如指定标准 Standard, 货币 Currency 或者 Percent 百分比格式。除此之外，还可以自定义一些格式化方式，通常对处理负数，零和空值非常有用。</p><pre><code><span style="color: #0000ff;">CREATE</span> MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Adventure Works</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Gross Profit formatted</span><span style="color: #ff0000;">]</span><br/>
+<span style="color: #0000ff;">AS</span><br/>
+<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Sales Amount</span><span style="color: #ff0000;">]</span> <span style="color: #808080;">-</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Total Product Cost</span><span style="color: #ff0000;">]</span><span style="color: #000000;">,<br/>
+FORMAT_STRING </span><span style="color: #808080;">=</span> "#,##<span style="color: #800000; font-weight: bold;">0</span>;<span style="color: #808080;">-</span> #,##<span style="color: #800000; font-weight: bold;">0</span>; <span style="color: #800000; font-weight: bold;">0</span> ;N<span style="color: #808080;">/</span><span style="color: #000000;">A",<br/>
+ASSOCIATED_MEASURE_GROUP </span><span style="color: #808080;">=</span> <span style="color: #ff0000;">'</span><span style="color: #ff0000;">Sales Summary</span><span style="color: #ff0000;">'</span><span style="color: #000000;">;<br/>
+<br/>
+</span><span style="color: #0000ff;">SELECT</span><span style="color: #000000;">{<br/>
+    </span><span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Gross Profit</span><span style="color: #ff0000;">]</span><span style="color: #000000;">,<br/>
+    </span><span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Gross Profit formatted</span><span style="color: #ff0000;">]</span><span style="color: #000000;"><br/>
+  } </span><span style="color: #0000ff;">ON</span><span style="color: #000000;"> COLUMNS,<br/>
+  {</span><span style="color: #ff0000;">[</span><span style="color: #ff0000;">Promotion</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Promotion Category</span><span style="color: #ff0000;">]</span>.MEMBERS} <span style="color: #0000ff;">ON</span><span style="color: #000000;"> ROWS<br/>
+</span><span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Adventure Works</span><span style="color: #ff0000;">]</span>;</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201310/23214652-2b47dc6a81fb42a384ff33f18c9e2e7f.png"/></p><p>FORMAT_STRING = "#,##0;- #,##0; 0 ;N/A" 四部分组成：正数，负数，0，空值 NULL。</p><p>但如果在 SSRS 报表中展示的话，在 MDX Query 中可以不需要这些设置，因为可以把数据的格式化放在报表的设计过程中来完成。</p>
+</div>]
+</body>
+</html>

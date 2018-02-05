@@ -1,0 +1,107 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">MDX 中最大值和最小值</h2><p>MDX 中最大值和最小值函数的语法和之前看到的 Sum 以及 Aggregate 等聚合函数基本上是一样的：</p><p>Max( {Set} [, Expression])</p><p>Min( {Set} [, Expression])</p><p>直接看例子，先查询出所有 Sub Category 下的 Reseller Sales Amount。</p><p> <img alt="" src="http://images.cnitblog.com/blog/477275/201311/06001203-8b1c7902656943fc87dcbd206ac5a231.png"/></p><p>然后使用 MAX 函数查询出 Sub Category 下最大的 Reseller Sales Amount。在这里查询的范围即 SET 集合是 Sub Category 的所有成员，比较大小的依据是 Reseller Sales Amount，即在 SET 集合中查找 Reseller Sales Amount 的最大值。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/06001238-4c583e180e974f18b87b83ba6710f532.png"/></p><p>比较每个 Sub Category 的 Reseller Sales Amount 和最大值的百分比。</p><pre><code>WITH<br/>
+MEMBER [Measures].[Percent of Max]<br/>
+AS<br/>
+([Measures].[Reseller Sales Amount]) / ([Measures].[Max Sales By Subcategory])<br/>
+, FORMAT_STRING="Percent"<br/>
+MEMBER [Measures].[Max Sales By Subcategory] AS<br/>
+Max(<br/>
+        {[Product].[Subcategory].[Subcategory].Members},<br/>
+        ([Measures].[Reseller Sales Amount])<br/>
+   )<br/>
+SELECT<br/>
+{<br/>
+   ([Measures].[Reseller Sales Amount]),<br/>
+   ([Measures].[Percent of Max])<br/>
+} ON COLUMNS,<br/>
+{[Product].[Subcategory].[Subcategory].Members} ON ROWS<br/>
+FROM [Step-by-Step]        </code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/06001359-ca4ba6cf53a84ffeb38019593ff0edfe.png"/></p><p>注意 Max、Min 函数与 TopCount 函数的区别：</p><p>Max、Min 函数返回的是在集合中元组对应表达式中最大或者最小的值，但 TopCount 是根据表达式查找集合中的成员。</p><p>下面查找 Reseller Sales Amount 最高的那个 Subcategory 成员。</p><pre><code>SELECT<br/>
+{<br/>
+  ([Measures].[Reseller Sales Amount])        <br/>
+} ON COLUMNS,<br/>
+TOPCOUNT<br/>
+(<br/>
+  {[Product].[Subcategory].[Subcategory].Members},<br/>
+  1,<br/>
+  ([Measures].[Reseller Sales Amount])        <br/>
+)ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/06001420-a77ecf456cb043bdb8ed95acdf727054.png"/></p><h2 id="articleHeader2">统计集合中的元组 Count( {Set} [, Flag])</h2><p>与前面的 MDX 聚合函数一样操作的对象都是集合 SET。Flag 的作用是：如果没有 Flag 或者指定 INCLUDEEMPTY，那么 Count 函数就直接返回集合中元组的数量；如果指定了 EXCLUDEEMPTY ，那么将返回与当前度量值相关联的非空的元组。</p><p>查询 Product 级别下所有成员的 Internet Sales Amount 和 Reseller Sales Amount，可以从下面的查询中看出不是所有产品都有 Internet Sales Amount 或者 Reseller Sales Amount 的销售记录。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/06001610-30571a97213c45b2afe4343e43e1ecd0.png"/></p><p>COUNT 一下各个 Category 下 Product 成员的个数 -</p><pre><code>WITH MEMBER [Measures].[Count of Products]<br/>
+AS<br/>
+COUNT(<br/>
+   EXISTING {([Product].[Product].[Product].Members)}<br/>
+)<br/>
+SELECT<br/>
+[Measures].[Count of Products] ON COLUMNS,<br/>
+{[Product].[Category].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/06001649-9b240e39dfe141a693933433769f7312.png"/></p><p>统计 Category 下 Reseller Sales Amount 大于等于 Internet Sales Amount 的 Products。</p><pre><code>WITH MEMBER [Measures].[Count of Products]<br/>
+AS<br/>
+COUNT(<br/>
+   EXISTING {([Product].[Product].[Product].Members)}<br/>
+)<br/>
+MEMBER [Measures].[Reseller vs Internet Count of Products]<br/>
+AS<br/>
+COUNT(<br/>
+   FILTER(  <br/>
+                 EXISTING {([Product].[Product].[Product].Members)},<br/>
+                 [Measures].[Reseller Sales Amount] &gt;= [Measures].[Internet Sales Amount]<br/>
+              )<br/>
+)<br/>
+SELECT<br/>
+{[Measures].[Count of Products],<br/>
+[Measures].[Reseller vs Internet Count of Products]} ON COLUMNS,<br/>
+{[Product].[Category].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/06001832-f7d667e1a1e649e6bd041a5eb496e1b1.png"/></p><p>上面的查询结果中仍然有不准确的地方，因为在统计过程中包含了 Reseller Sales Amount 为 NULL， Internate Sales Amount 为 NULL 或者两者都为 NULL 的元组，实际上这类元组应该在统计的时候要被排除掉。</p><p>因此，加上 EXCLUDEEMPTY 关键字再来查询一下 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/06001854-88b968d063fd4cafa94bd4e512f1d96e.png"/></p><p>但是通过观察最后的查询结果发现尽管使用了 EXCLUDEEMPTY 关键字也没有什么变化，但是确实有一些 Products 是没有 Reseller Sales Amount 数据的。其原因就在于这里会造成 Infinite Recursion 错误，只不过在这里被自动处理掉了。</p><p>有关 Infinite Recursion 的内容可以参看 MDX Step by Step 读书笔记(五) - Working with Expressions (MDX 表达式) - Infinite Recursion 和 SOLVE_ORDER 原理解析</p><p>可以通过 CrossJoin {[Measures].[Reseller Sales Amount]} 来解决这个问题，因为这样 COUNT 的时候就知道了上下文环境，元组中关联的度量值对象是 {[Measures].[Reseller Sales Amount]}。</p><pre><code>WITH MEMBER [Measures].[Count of Products]<br/>
+AS<br/>
+COUNT(<br/>
+   EXISTING {([Product].[Product].[Product].Members)}<br/>
+)<br/>
+MEMBER [Measures].[Reseller vs Internet Count of Products]<br/>
+AS<br/>
+COUNT(<br/>
+    FILTER(<br/>
+                 EXISTING {([Product].[Product].[Product].Members)},<br/>
+                [Measures].[Reseller Sales Amount] &gt;= [Measures].[Internet Sales Amount]<br/>
+              )<br/>
+)<br/>
+MEMBER [Measures].[NOEMPTY Reseller vs Internet Count of Products]<br/>
+AS<br/>
+COUNT(<br/>
+      FILTER(<br/>
+                    EXISTING {([Product].[Product].[Product].Members)},<br/>
+                    [Measures].[Reseller Sales Amount] &gt;= [Measures].[Internet Sales Amount]<br/>
+               )* {[Measures].[Reseller Sales Amount]},<br/>
+      EXCLUDEEMPTY<br/>
+)<br/>
+SELECT<br/>
+{[Measures].[Count of Products],<br/>
+  [Measures].[Reseller vs Internet Count of Products],<br/>
+  [Measures].[NOEMPTY Reseller vs Internet Count of Products]} ON COLUMNS,<br/>
+{[Product].[Category].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/06002137-bb4d6f2c9c2543dfafbcd6e1de446656.png"/></p><h2 id="articleHeader3">DistinctCount 函数</h2><p>MDX 提供了另外一种 COUNT 的形式 - DistinctCount，它可以在执行 COUNT 之前先忽略掉空的以及重复的元组然后进行统计。它其实在操作上等同于在 COUNT 函数中使用 DISTINCT 关键字：COUNT(DISTINCT ({SET}), EXCLUDEEMPTY)</p><p>它的实际语法是：DistinctCount({SET})</p><p>但是如果仅仅是需要去掉重复元组后再统计 COUNT ，并且也允许包含空的元组的统计，那么就应该使用:</p><p>COUNT(DISTINCT ({SET})) 或者 COUNT(DISTINCT ({SET}), INCLUDEEMPTY)</p><h2 id="articleHeader4">Generate 函数</h2><p>Generate ({Set}, Expression) ，Generate 函数在这一篇笔记中已经介绍过了 -</p><p>MDX Step by Step 读书笔记(六) - Building Complex Sets (复杂集合的处理) - Generate 和 Extract 函数的使用</p><p>简单回顾一下这个函数，它类似于一个循环，相当于在集合中的每一个元组都去匹配一下表达式，符合要求的元组留下来并最终和其它一样满足要求的元组共同组成一个新的集合 SET 返回。</p><p>它还有另外的一种形式可以在聚合中用到：Generate({Set}, Expression [, Delimiter])</p><p>在这个形式中，Generate 函数仍然会迭代 SET 集合中的每一个元组并匹配表达式中的内容，符合条件的元组根据 Delimiter 分割符与其它元组形成一个字符串。</p><pre><code>WITH<br/>
+MEMBER [Measures].[Products] AS<br/>
+Count(<br/>
+   EXISTING {[Product].[Product].[Product].Members}<br/>
+)<br/>
+MEMBER [Measures].[Products List] AS<br/>
+Generate(<br/>
+   EXISTING {[Product].[Product].[Product].Members},<br/>
+   [Product].[Product].CurrentMember.Name,<br/>
+   " | "<br/>
+)<br/>
+SELECT<br/>
+{<br/>
+  ([Measures].[Products]),<br/>
+  ([Measures].[Products List])<br/>
+} ON COLUMNS,<br/>
+{[Product].[Subcategory].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/06002455-4cc6381f5685404cb3742ab3a9453445.png"/></p>
+</div>]
+</body>
+</html>

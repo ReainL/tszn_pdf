@@ -1,0 +1,14 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h3 id="articleHeader1" style="margin-left: 0px;">开篇介绍</h3><p style="margin-left: auto;">MultiCast 多播转换可以将一个输入转换成一个或者多个向下的输出，但是它没有错误输出。简单总结，即一个输入多个输出无错误输出。</p><p style="margin-left: auto;">它主要用在的场景就是需要将一个输入流中的数据创建成不同的逻辑数据副本，对不同的多个目标表文件的时候，不同的文件或者目标表可以选择数据源中的不同列输出。比如有一个 Excel 数据源表，需要将 Excel 数据源中的 A,B,C 三列的数据输出到 STAGING A 表中；同时，需要将此数据源中的 A, E, F 列同时输出到另外一个文本文件中。如果按照以前的做法，可能会使用到两个 Data Flow Task 数据流任务，然后分别配置成 Excel -&gt; 表 STAGING A ， Excel -&gt; .txt 文件。那么如果了解 MultiCast 控件的用法，就可以不需要这么处理了。</p><h3 id="articleHeader2" style="margin-left: 0px;">案例演示</h3><p style="margin-left: auto;">这个案例使用一个平面文件作为数据源。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/032053448455176.png"/></p><p style="margin-left: auto;">需求就是将这个平面文件输出到两个不同的目标表 - </p><p style="margin-left: auto;">一个是 T30_STAGING_INTERNET_SALES，这张表只有 6 列。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/032053552365167.png"/></p><p style="margin-left: auto;">另一个就是将这个平面文件中 SalesAmount &gt; 1000 的输出到另外一个表、或者文件，这里的示例使用一张表 T030_STAGING_1000_SALESAMOUNT。表的结构和文件内容是一致的，这样演示起来要方便一些。</p><p style="margin-left: auto;">在完成平面数据源的配置之后，直接拖放一个 MultiCast 多播控件即可，可以注意到上图中，它是有一个输入和多个输出的。</p><p style="margin-left: auto;">在左侧的 OLD_DST_STAGING_INTERNET_SALES 源和目标关系配置中，由于目标只需要几列，因此配置中只匹配需要的列即可。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/032054038302675.png"/></p><p style="margin-left: auto;">右侧 Conditional Split 控件中，只处理 SalesAmount &gt; 1000 的数据，目标表只和 1000_SALESAMOUNT 输出源关联。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/032054123452441.png"/></p><p style="margin-left: auto;">最后的输出可以看到两个目标最终接受数据的结果。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/032054301427870.png"/></p><h3 id="articleHeader3" style="margin-left: 0px;">MultiCast 和 Conditional Split 的区别</h3><p style="margin-left: auto;">在形状上，两者感觉差不多， 并且相同的地方都是有一个输入，一个或者多个输出。</p><p style="margin-left: auto;">但是不同的是：</p><ul><li>MultiCast 可以将每一行定向到每一个输出，即往下输出的内容是一致的，副本数据的拷贝 ; Conditional Split 则是将一行只定位到一个输出，按条件走。</li><li>MultiCast 无法写表达式，也无法和系统变量，用户自定义变量交互；Conditional Split 则可以使用表达式访问变量，列，函数等。</li><li>MultiCast 不支持错误输出处理；Conditional Split 支持错误输出处理。</li></ul>
+<ul class="aw-upload-file-list">
+</ul>
+</div>]
+</body>
+</html>

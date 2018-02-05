@@ -1,0 +1,43 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h3 id="articleHeader1" style="margin-left: 0px;">开篇介绍</h3><p>在上一篇文章中讲解了在 SQL 和 SSIS 中使用 PIVOT 进行行列转换，在这一篇文章中讲解逆向的 UNPIVOT 操作。</p><p>注：本文都是 SQL Server 2012 版本，2008 R2 在 SSIS 中配置不同。</p><h3 id="articleHeader2" style="margin-left: 0px;">SQL UNPIVOT 操作</h3><p>测试的源数据</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/201820279848118.png"/></p><p>要求转换之后的结果。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/201820352032613.png"/></p><p>在 SQL 语句中，需要掌握这样的一个转换语法规则就可以非常容易的解决这个问题了。</p><pre><code><span style="color: rgb(0, 128, 128); line-height: 1.5 !important;">/*</span><span style="color: rgb(0, 128, 128); line-height: 1.5 !important;">*<br/>
+SELECT 非透视转换列，<br/>
+    透视转换新列，<br/>
+    透视转换数据新列<br/>
+FROM(<br/>
+  SELECT 非透视转换列，透视转换列1，透视转换列2...<br/>
+  FROM 源数据表<br/>
+ ) AS 别名<br/>
+UNPIVOT<br/>
+ （<br/>
+  透视转换数据新列 FOR <br/>
+  透视转换新列 IN (透视转换列1，透视转换列2...)<br/>
+  ) AS 别名<br/>
+*</span><span style="color: rgb(0, 128, 128); line-height: 1.5 !important;">*/</span></code></pre><ul><li>非透视转换列 - 不需要转换的列，或者理解为轴，不移动的列。</li><li>透视转换新列 - 需要被新创建的列的名称，这个列的数据是描述转换前原有列的名称。即源表中1,2,3,4... 是原有列的名称，那么转换之后这 1,2,3,4 将变成透视转换新列的值，透视转换新列在这里我们可以取一个名字叫 SalesMonth。</li><li>透视转换数据新列 - 需要被新创建的存放 非透视转换列与透视转换新列 交叉时的数据；比如 Biycle 1月份的数据 4 就需要存放在这个列中。</li><li>透视转换列1,2 - 即需要将列名称转换并存放在 透视转换新列 中的那些列。</li></ul><p>有了上面的这个语法，就非常容易实现这种 UNPIVOT的操作了。</p><pre><code><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">SELECT</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> ProductName,<br/>
+       SalesMonth,<br/>
+       SalesCount<br/>
+</span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">FROM</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">(<br/>
+        </span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">SELECT</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> ProductName,<br/>
+               </span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">1</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">,<br/>
+               </span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">2</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">,<br/>
+               </span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">3</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">,<br/>
+               </span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">4</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">,<br/>
+               </span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">5</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">,<br/>
+               </span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">6</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">,<br/>
+               </span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">7</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span><br/>
+        <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">FROM</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> T041_PRODUCT_SALES<br/>
+    ) </span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">AS</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> SRC<br/>
+UNPIVOT<br/>
+    (<br/>
+        SalesCount </span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">FOR</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"><br/>
+        SalesMonth </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">IN</span> (<span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">1</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span>, <span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">2</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span>, <span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">3</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span>, <span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">4</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span>,  <span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">5</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span>,  <span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">6</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span>, <span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">[</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">7</span><span style="color: rgb(255, 0, 0); line-height: 1.5 !important;">]</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">)<br/>
+    )</span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">AS</span> UNP </code></pre><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/201820352032613.png"/></p><p style="margin-left: auto;">还有一点也要注意：<span style="color: rgb(255, 0, 0);">UNPIVOT 不完全是 PIVOT 的逆操作；因为在 PIVOT 中我们可以通过聚合函数将多行的数据聚合再转换，但是 UNPIVOT 是不能知道聚合值该如何还原成细节行数据的。</span></p><h3 id="articleHeader3" style="margin-left: 0px;">SSIS 中的 UNPIVOT 操作</h3><p>SSIS 中的 UNPIVOT 操作也非常简单，只要上一篇文章中的 PIVOT 操作弄清楚了，那么这个 UNPIVOT 的配置就会容易很多，只需要理解对应的配置选项即可。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/201823088753899.png"/></p><p>在数据流中拖放 UNPIVOT 控件。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/201823170158777.png"/></p><p>在 UNPIVOT 的配置中：</p><ul><li>非透视转换列 - ProductName 是不需要转换的。</li><li>透视转换新列 - Pivot key value column name，这里是 SalesMonth。</li><li>透视转换数据新列 -  交叉数据的存放位置 - SalesCount</li><li>透视转换列1,2 - Input Column 中被选中的即是。</li></ul><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/201823371873049.png"/></p><p>运行执行中观察到的结果。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/201823496712667.png"/></p>
+</div>]
+</body>
+</html>

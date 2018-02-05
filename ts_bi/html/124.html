@@ -1,0 +1,41 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<p>假设我们只想显示一些与数据没有任何关联的维度成员信息，并且希望它们能够以行集的形式来显示，那么在 MDX 中就应该直接显示 ROWS  AXIS (1) 并且忽略掉 COLUMNS AXIS(0)。比如说有100个成员信息，如果是一列100行的形式通常符合大家的查询习惯，如果是一行100列，读起来就比较困难。</p><p>需要了解的是 SELECT 语句最多可以支持 128 个轴，轴的序号从 0 ~ 127，但是基本上我们不会使用的到那么多， 一般只使用前两个, 即我们常用的 COLUMNS 和 ROWS, 因为大多数客户端工具只能支持到二维即显示行和列。并且是使用这些轴的名称的时候, 他们的顺序必须是连续的。即如果写了 ROWS， 那么COLUMNS 也必须存在 , 不能只使用 ROWS 而不使用COLUMNS。</p><p>那么就只要这样做就可以了，在 COLUMNS 即 0 轴中放置一个空的 SET 集合 { }，然后在 ROWS 轴上访问所需要的成员。</p><pre><code><span style="font-family: 'Microsoft Yahei';"><span style="color: #0000ff;">SELECT</span><br/>
+{ } <span style="color: #0000ff;">ON</span> <span style="color: #800000; font-weight: bold;">0</span>,<br/>
+{ <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.MEMBERS } <span style="color: #0000ff;">ON</span> <span style="color: #800000; font-weight: bold;">1</span><br/>
+<span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Adventure Works</span><span style="color: #ff0000;">]</span></span></code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201310/23210334-9115608305b74e37855cfaa8033fcfec.png"/></p><p>如果只需要查询所有包含 "John" 这个字的成员，比如说以后可以做成根据关键字查询 -</p><pre><code><span style="font-family: 'Microsoft Yahei';"><span style="color: #0000ff;">SELECT</span><br/>
+{ } <span style="color: #0000ff;">ON</span> <span style="color: #800000; font-weight: bold;">0</span>,<br/>
+{<br/>
+     Filter(<br/>
+<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.MEMBERS,<br/>
+InStr(<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.CurrentMember.Name, <span style="color: #ff0000;">'</span><span style="color: #ff0000;">John</span><span style="color: #ff0000;">'</span>) <span style="color: #808080;">&gt;</span> <span style="color: #800000; font-weight: bold;">0</span><br/>
+              )<br/>
+} <span style="color: #0000ff;">ON</span> <span style="color: #800000; font-weight: bold;">1</span><br/>
+<span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Adventure Works</span><span style="color: #ff0000;">]</span></span></code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201310/23210354-bda034b7713243358b3653b2d85b790d.png"/></p><p>如果为了显示 ROWS 轴而在 COLUMNS 轴上加上其它的度量值这样会降低查询效率，因为在 ROWS 中的每一个成员都会到 Cube 空间中去匹配对象的度量值。想这样在 COLUMNS 轴没有度量值的参入，那么 ROWS 轴上的维度成员就直接可以从维度空间里获取，效率更高一些。</p><p>如果有一些第三方的工具或者编译器要求必须在 COLUMNS 位置提供度量值数据的话，那么可以使用常量数据来表示 ，这样仍然会比访问 Cube 中的度量值成员效率要高，只不过这个查询的结果并不真正使用而已。</p><pre><code><span style="font-family: 'Microsoft Yahei';"><span style="color: #0000ff;">WITH</span> MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">CustomerConstant</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+<span style="color: #800000; font-weight: bold;">1</span><br/>
+<span style="color: #0000ff;">SELECT</span><br/>
+{ <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">CustomerConstant</span><span style="color: #ff0000;">]</span> } <span style="color: #0000ff;">ON</span> <span style="color: #800000; font-weight: bold;">0</span>,<br/>
+{<br/>
+     Filter(<br/>
+<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.MEMBERS,<br/>
+InStr(<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.CurrentMember.Name, <span style="color: #ff0000;">'</span><span style="color: #ff0000;">John</span><span style="color: #ff0000;">'</span>) <span style="color: #808080;">&gt;</span> <span style="color: #800000; font-weight: bold;">0</span><br/>
+              )<br/>
+} <span style="color: #0000ff;">ON</span> <span style="color: #800000; font-weight: bold;">1</span><br/>
+<span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Adventure Works</span><span style="color: #ff0000;">]</span></span></code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201310/23210444-7c4537cbb5b64809af8dac703d9694f9.png"/></p><p>参数化的查询 -</p><pre><code><span style="font-family: 'Microsoft Yahei';"><span style="color: #0000ff;">SELECT</span><br/>
+{ } <span style="color: #0000ff;">ON</span> <span style="color: #800000; font-weight: bold;">0</span>,<br/>
+{<br/>
+Filter(<br/>
+<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.MEMBERS,<br/>
+InStr(<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Customer</span><span style="color: #ff0000;">]</span>.CurrentMember.Name, <span style="color: #008000;">@CustomerName</span>) <span style="color: #808080;">&gt;</span> <span style="color: #800000; font-weight: bold;">0</span><br/>
+  )<br/>
+} <span style="color: #0000ff;">ON</span> <span style="color: #800000; font-weight: bold;">1</span><br/>
+<span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Adventure Works</span><span style="color: #ff0000;">]</span></span></code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201310/23210504-ccd312a96a5b45349a65ce438f9772d9.png"/></p>
+</div>]
+</body>
+</html>

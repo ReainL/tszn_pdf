@@ -1,0 +1,35 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>我们通常在数据仓库的设计中碰到这种问题：在维度设计中如果这个维度只有一个属性，那我们面临的选择是为这个属性单独创建一个维度，还是将这个维度的属性直接放在事实表中作为事实表的一部分？</p><h2 id="articleHeader2">案例解释</h2><p>假设这里有一个维度，通常在设计上至少会有两列（DimKey 和 DimAttribute 属性），事实表通过 DimKey 关联到这个维度。首先，在查询阶段多表的 JOIN 关系比较单表的查询在效率上肯定要低一些，我们来看下下面的这个例子：</p><pre><code><span style="color: rgb(0, 0, 255);">CREATE</span><span style="color: rgb(0, 0, 0);"> DIM_TABLE<br/>
+(<br/>
+ DIM_KEY  </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(255, 0, 255);">IDENTITY</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>,<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span><span style="color: rgb(0, 0, 0);">),<br/>
+ DIM_ATTR </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">20</span><span style="color: rgb(0, 0, 0);">)<br/>
+)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">CREATE</span><span style="color: rgb(0, 0, 0);"> FACT_TABLE<br/>
+(<br/>
+ DIM_KEY </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DIM_TABLE(DIM_KEY),<br/>
+ MEASURE </span><span style="color: rgb(0, 0, 255);">DECIMAL</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">18</span>,<span style="color: rgb(128, 0, 0); font-weight: bold;">2</span><span style="color: rgb(0, 0, 0);">)<br/>
+)</span></code></pre><p>一个典型的星型结构的查询如下：</p><pre><code><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> D.DIM_ATTR,<br/>
+       </span><span style="color: rgb(255, 0, 255);">SUM</span>(F.MEASURE) <span style="color: rgb(0, 0, 255);">AS</span><span style="color: rgb(0, 0, 0);"> TOTAL<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span> FACT_TABLE <span style="color: rgb(0, 0, 255);">AS</span><span style="color: rgb(0, 0, 0);"> F<br/>
+</span><span style="color: rgb(0, 0, 255);">INNER</span> <span style="color: rgb(128, 128, 128);">JOIN</span> DIM_TABLE <span style="color: rgb(0, 0, 255);">AS</span><span style="color: rgb(0, 0, 0);"> D<br/>
+</span><span style="color: rgb(0, 0, 255);">ON</span> F.DIM_KEY <span style="color: rgb(128, 128, 128);">=</span><span style="color: rgb(0, 0, 0);"> D.DIM_KEY<br/>
+</span><span style="color: rgb(0, 0, 255);">GROUP</span> <span style="color: rgb(0, 0, 255);">BY</span> D.DIM_ATTR</code></pre><p>如果把这个属性直接放在 FACT 表中，结果和查询如下：</p><pre><code><span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> FACT_TABLE_2<br/>
+(<br/>
+ DIM_ATTR </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> DIM_TABLE(DIM_KEY),<br/>
+ MEASURE </span><span style="color: rgb(0, 0, 255);">DECIMAL</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">18</span>,<span style="color: rgb(128, 0, 0); font-weight: bold;">2</span><span style="color: rgb(0, 0, 0);">)<br/>
+)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(255, 0, 255);">SUM</span>(MEASURE) <span style="color: rgb(0, 0, 255);">AS</span><span style="color: rgb(0, 0, 0);"> TOTAL<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> FACT_TABLE_2<br/>
+</span><span style="color: rgb(0, 0, 255);">GROUP</span> <span style="color: rgb(0, 0, 255);">BY</span> DIM_ATTR</code></pre><p>我们的查询和聚合更加简单，从查询效率上来说要更好一些。但是我们通常又为什么会选择将这个单独的属性还是放在维度表中，这里有以下几个原因是我们需要考虑的：</p><p>1. 如果事实表非常庞大的话，使用 DIM_KEY INT 类型 4 Bytes 相对于 DIM_ATTR 的 NVARCHAR(20) 类型可以明显的减少事实表的体积。</p><p>2. 如果这个属性值在源业务系统发生改变的话，就意味着我们要更新事实表中所有与该属性相关的属性值。</p><p>3. 有可能今天这个维度确实只有一个属性，但是谁又能确保这个维度以后不会添加别的相关的属性呢？</p><p>数据仓库的设计是一个迭代的开发过程，开发一年，维护若干年，如果我们可以考虑到以上原因，就可以很清楚的考虑到在设计阶段是否有必要将单一属性挑选出来作为维度来设计了。</p>
+</div>]
+</body>
+</html>

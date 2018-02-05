@@ -1,0 +1,54 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">元组相关基本概念<br/></h2><p>1. 在 Analysis Service 分析服务中，Cube (多维数据集) 是以一个多维数据空间来呈现的。在Cube 中，每一个纬度的属性层次结构都形成了一个轴。沿着这个轴，在属性层次结构上的每一个成员包括 “ALL” 成员都在轴上占了一个点。</p><p>2. 包含度量值的纬度叫做事实纬度或者度量纬度，度量属性层次结构和其它属性层次结构的区别就是度量属性层次结构没有 ALL 这个成员。</p><p>3. 成员的引用 – 引用属性层次结构中的成员有很多方式，但基本的成员引用可以通过与它相关联的纬度和属性层次结构来实现: [Dimension].[Hierarchy].[Member]。</p><p>4. 理解这幅图</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/09150717-8de02b470cdd4e0d8998bd6464b24507.png"/></p><p>在 Product 纬度中有两个属性层次结构 – Category 和 Subcategory，在Date 纬度中也有两个属性层次结构 – Calendar Year 和 Fiscal Year，这两个属性层次结构在一起构成了一个用户自定义的层次结构 – Calendar-To-Fiscal Year。这四个原始的属性层次结构再加上度量值属性层次结构，在Cube 空间里总共有5个轴，那么在这个纬度空间里的点因此需要用5个元素组成的元组来定位。</p><p>5. 通过使用元组可以定位到Cube 空间中的一个点。但是在这个点上，它是以一个简单的值来显示的，这个点可以理解为 Cell – 单元格。Cell 其实是一个对象，它有很多不同的属性。当访问这个单元格时，各种不同的属性会随之返回。默认返回的属性有 VALUE 和 FORMATTED_VALUE。</p><p>6. VALUE 属性包含了聚合的度量值，这个值是在与这个单元格相关联的其它属性层次结构上聚合的度量值。</p><p>7. FORMATTED_VALUE 属性包含了以字符串形式呈现的VALUE，这种格式化在设计阶段就已经确定了，它只是用来控制最终在MDX 查询界面显示的格式， 可以通过查看 CELL PROPERTIES 来了解VALUE 和FORMATTED_VALUE。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/09150810-5afdc20f3c494003a8881039ceb33215.png"/></p><p>CellOrdinal 属性表示的是在查询返回的集合中的位置。</p><p>8. 可以添加 CELL PROPERTIES 关键字，但这样的话就需要显示定义出 VALUE 和 FORMATTED_VALUE，否则这两个属性将不会被返回。</p><p>  下面查询的内容将返回其它的单元格属性 FORMATTED_VALUE和 FORMAT_STRING</p><pre><code>SELECT  FROM [Chapter 3 Cube]  <br>
+WHERE (  　　　　<br/>
+[Product].[Subcategory].[Mountain Bikes],  　　　　<br/>
+[Date].[Calendar Year].[All Periods],  　　　　<br/>
+[Date].[Fiscal Year].[All Periods],  　　　　<br/>
+[Product].[Category].[Bikes],  　　　　<br/>
+[Measures].[Measures].[Reseller Sales Amount]        <br/>
+) CELL PROPERTIES FORMATTED_VALUE, FORMAT_STRING</br></code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/09150937-52a296d458294287b9cd4589bb254c98.png"/></p><p>返回的单元格属性就没有 VALUE 和 FORMATTED_VALUE 了。</p><p>9. 局部元组(Partial Tuple) – 对比元组 Tuple而言，在局部元组中有一个或者多个成员的引用被忽略掉了,没有显式的写出来。一个完整的元组可以定位到Cube空间的一个点，Analysis Services 在处理局部元组的时候将会按照一定的规则去自动的填充在局部元组中被忽略掉的成员引用: 1. 如果成员引用被忽略，将使用属性的默认成员(即这个属性的默认值)  2. 如果成员引用被忽略并且这个成员没有默认值，那么将使用这个属性的 All 成员。 3. 如果成员引用被忽略，成员没有默认值也没有All 这个成员，那么就使用这个属性的第一个成员(这个属性下所有值集合中的第一个值)。</p><p>10. 局部元组的使用 – 当元组中缺少度量值属性成员的引用时</p><pre><code>SELECT  FROM [Chapter 3 Cube]  <br/>
+WHERE (              　　　　<br/>
+[Date].[Calendar Year].[All Periods],              　　　　<br/>
+[Date].[Fiscal Year].[All Periods],              　　　　<br/>
+[Product].[Category].[Bikes],              　　　　<br/>
+[Product].[Subcategory].[Mountain Bikes],              　　　　<br/>
+[Measures].[Measures].[Reseller Sales Amount]        <br/>
+)</code></pre><p>查询结果是 - $26,492,684.38</p><p>这个元组中包含5个轴，其中Date 纬度上引用的都是属性层次结构中的 ALL 成员，其含义为查询 Bikes 大类下的Mountain Bikes 所有的零售额。All 成员就是表示所有年份，不考虑具体时间点或时间段的零售额，只考虑总销售额，但也明确了是在 Bikes 大类 和 Mountain Bikes 子类范围。</p><p>现在在这个完整的元组中去掉一个成员引用 –</p><pre><code>SELECT  FROM [Chapter 3 Cube]  <br/>
+WHERE (              　　　　　　<br/>
+[Date].[Calendar Year].[All Periods],              　　　　　　<br/>
+[Date].[Fiscal Year].[All Periods],              　　　　　　<br/>
+[Product].[Category].[Bikes],              　　　　　　<br/>
+[Product].[Subcategory].[Mountain Bikes]        )</code></pre><p>查询结果仍然相同 - $26,492,684.38 结果相同。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/09150918-af3fa0fc3ed44ff1a9552e5a08323352.png"/></p><p>此图中 Analysis Services 首先检查各个轴，也就是纬度有没有缺失。根据上面的代码能够检查到对于度量值属性层次结构这个轴右缺失，于是第一步先检查这个属性有没有默认的成员。通过检查发现这个属性默认的成员引用就是 Reseller Sales Amount, 因此就会自动将对这个成员的引用补充到这个元组中使其变成一个完整的Tuple 元组，这样再集合其它的成员引用来定位到Cube空间的某一个点。</p><p>度量值属性层次结构中的默认成员是在设计阶段定下的，因为度量值属性层次结构没有ALL这个成员，所有如果度量值属性层次结构中没有指定默认成员的话，那么第一个度量值成员将被填充到元组中。</p><p>11. 局部元组 – 当元组中缺少属性层次结构的引用时</p><pre><code>SELECT  FROM [Chapter 3 Cube] <br/>
+ WHERE (  　　　　　　<br/>
+[Product].[Category].[Bikes],  　　　　　　<br/>
+[Product].[Subcategory].[Mountain Bikes]        <br/>
+)</code></pre><p>结果 - $26,492,684.38</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/09151057-fd7f0b99b3794a13847dc30193089b80.png"/></p><p>5个轴，其中 Date两个轴再加上度量值这个轴总共3个轴没有对应的点，即在Cube 这个空间里缺少3个轴的坐标引用，无法定位到空间的具体某一点。对于度量值成员的引用直接按照第一种规则使用默认成员引用填充，但是Date纬度上的Calendar Year和Fiscal Year 这两个属性层次结构(即轴)并没有指定默认成员，因此将使用第二规则使用All成员。</p><p>因此等同于　－</p><pre><code>SELECT F ROM [Chapter 3 Cube]  <br/>
+WHERE (              　　　　　　<br/>
+[Date].[Calendar Year].[All Periods],              　　　　　　<br/>
+[Date].[Fiscal Year].[All Periods],              　　　　　　<br/>
+[Product].[Category].[Bikes],              　　　　　　<br/>
+[Product].[Subcategory].[Mountain Bikes],              　　　　　　<br/>
+[Measures].[Measures].[Reseller Sales Amount]  　　　　<br/>
+)   </code></pre><p>12. 用户自定义的属性层次结构 Calendar-To-Fiscal Year 是一个用户自定义的属性层次结构，如果要引用Calendar Year 2003 这个成员的话可以这么引用 –</p><p>[Dimension].[Hierarchy].[Member]</p><p>[Date].[Calendar-To-Fiscal Year].[CY 2003]</p><p>用户自定义的属性层次结构实际上也是来源于其它属性层次结构，所以它们的成员标识符很有可能并不是唯一的。</p><p>比如这样引用 [Date].[Calendar-To-Fiscal Year].&amp;[2003]，问题在于不清楚这里的Key 2003 是指Calendar Year 2003 还是指 Fiscal Year 2003。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/09151214-deec3d6ac7834051ba6b04658cee9210.png"/></p><p>因此此时需要一个Level来区分:</p><p>[Dimension].[Hierarchy].[Level].[Member]</p><p>[Date].[Calendar-To-Fiscal Year].[Calendar Year].$[2003]</p><p>但是尽管如此也会出现其它的问题，例如在用户自定义的属性层次结构中存在两个相同的FY2004 成员，这时需要加上它们的Parent 节点 - 　 [Date].[Calendar-To-Fiscal Year].[Calendar Year].[CY 2002].[FY 2003] [Date].[Calendar-To-Fiscal Year].[Calendar Year].[CY 2003].[FY 2003]  </p><p>13. 理解用户自定义层次结构 User-Hierarchies</p><p>用户自定义层次结构上的成员实际最终引用的还是其它属性层次结构上的成员。</p><pre><code>SELECT  FROM [Chapter 3 Cube]  <br/>
+WHERE (  　　　　　　<br/>
+[Date].[Calendar-To-Fiscal Year].[Calendar Year].[CY 2003].[FY 2003]  　　　　<br/>
+)</code></pre><p>Analysis Services 首先在用户自定义层次结构中定位到在 Fiscal Year level 上的成员 FY 2003 以及与之相关联的　Calendar Year 上的 CY 2003成员，再各自定位到属性层次结构轴上的成员引用，这个结果和这里的查询结果是一样的，因为它们有相同的引用。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/09151332-702f040fce6b40829d31eb2c165c70df.png"/></p><pre><code>SELECT  FROM [Chapter 3 Cube]  <br/>
+WHERE (  　　　　　　<br/>
+[Date].[Calendar Year].[CY 2003],  　　　　　　<br/>
+[Date].[Fiscal Year].[FY 2003]        )  </code></pre><p>14. 当用户自定义层次结构和属性层次结构在同一个轴上引用同一个成员时</p><pre><code>SELECT  FROM [Chapter 3 Cube]  <br/>
+WHERE (  　　　　　　<br/>
+[Date].[Calendar-To-Fiscal Year].[Calendar Year].[CY 2002].[FY 2003],  　　　　　　[<br/>
+Date].[Fiscal Year].[FY 2003]        )</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/09151350-d1d3a02f16ef4bb4a9b6f53df89c3eca.png"/></p><p>不会发生冲突，因为在一条轴上定位的都是同一个点。</p><p>15. 当用户层次结构和属性层次结构在同一个轴上引用不同成员时</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/09151418-bd3f9077be7e424eb6d941029feb7d51.png"/></p><pre><code>SELECT  FROM [Chapter 3 Cube]  <br/>
+WHERE (  　　　　　　<br/>
+[Date].[Calendar-To-Fiscal Year].[Calendar Year].[CY 2002].[FY 2003],  　　　　　　<br/>
+[Date].[Fiscal Year].[FY 2002]        ) </code></pre><p>发生冲突，返回NULL，原因就在于 Analysis Service 不能确定在 Fiscal Year上到底要引用哪一个成员。</p><p>16. 如何通过Name引用一个成员 – [Dimension].[Hierarchy].[Member Name]</p><p>示例－[Product].[Category].[Bikes]</p><p>17. 如何通过Key 引用一个成员 – [Dimension].[Hierarchy].&amp;[Member Key] 示例 – [Product].[Category].&amp;[1]  </p><p>18. 如何在用户自定义层次结构中通过某个Level来访问一个成员 – [Dimension].[Hierarchy].[Level].[Member Name] [Date].[Calendar-To-Fiscal Year].[Calendar Year].[CY 2003]  </p><p>19. 如何通过元组Tuple定位到一个Cell 单元格 引用成员的结构是 […].[…].[….]，引用元组是通过一对圆括号将成员括起来来定位Cube空间的一个点. ([….].[….].[….], [….].[….].[….], [….].[….].[….])</p><p>20. 如何来查看返回Cell中的其它属性 – CELL PROPERTIES<br/></p>
+</div>]
+</body>
+</html>

@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<p style="margin-left: auto;">通常情况下，实现一个饼图默认的效果就是 -</p><p style="margin-left: auto;"><img alt="" height="364" src="http://images.cnitblog.com/i/477275/201405/071017293852646.png" width="811"/></p><p style="margin-left: auto;">一般都是直接显示数字结果 -</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/i/477275/201405/071018525736992.png"/></p><p style="margin-left: auto;">那么如果需要显示成百分比，通常的做法可能选择先在后台 SQL 查询的时候计算好百分比，但是这里有一种更简单的技巧。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/i/477275/201405/071020136823440.png"/></p><p style="margin-left: auto;">编辑 Label data, 我们自己给它一个格式化效果。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/i/477275/201405/071022054488950.png"/></p><p style="margin-left: auto;">=FormatCurrency(Sum(Fields!ResellerSales.Value) / 1000, 0) &amp; " (#PERCENT{P2})"</p><ul><li>其中 FormatCurrency 是用来格式化 Sum(Fields!ResellerSales.Value) 的，因为数字太大，所以数字以1000为单位计算，没有小数。即页面显示 12， 实际上指的是 12000。</li><li>&amp; 是 SSRS 中的字符串连接符。</li><li>“#PERCENT{Pn}”，其中 n 是要显示的小树，这里我保留两位小数。</li></ul><p style="margin-left: auto;">这样就格式化了饼图上的数字标签，并自动计算出了百分比。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/i/477275/201405/071025263071515.png"/></p>
+</div>]
+</body>
+</html>

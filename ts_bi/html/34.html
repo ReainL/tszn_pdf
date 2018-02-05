@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>在做 ETL 项目的时候，往往很多 Package 的开发都是基于相同的模型和流程。比如在 Package 开始运行时需要向 Process Log 表中插入记录，在 Package 运行结束的时候更新运行状态。</p><p> <img alt="" height="665" src="http://images.cnitblog.com/blog/477275/201306/20173105-50c0089f41bb46d889ef5613c8193169.x-png" width="803"/></p><p>在错误处理阶段同一个项目中的所有 Package 也是相同的处理方式，除此之外还有设计到 Package 的配置还有一些参数和验证流程等等基本上都一致。</p><p> <img alt="" src="http://images.cnitblog.com/blog/477275/201306/20173208-4b8e868fd8854a27adacdeaa023b299e.x-png"/></p><h2 id="articleHeader2">配置过程</h2><p>如果每次开发一个 Package 都需要重新拖拉这些控件并配置连接管理器，配置 SQL 语句和参数，并且要保证配置的东西都正确那么还需要简单的测试下, 这些会浪费很多不必要的精力和时间。特别是不同的开发人员可能在命名方式，以及配置方式和规范上如果不一致的话在后期维护阶段是一件非常麻烦的事情。</p><p> <img alt="" src="http://images.cnitblog.com/blog/477275/201306/20173235-e64fc58819b141dd80d04a98952c14bc.x-png"/></p><p>因此在项目开始初期，根据业务需要设计好日志系统、配置好通用的数据库连接配置和必要的参数、通用的参数验证等等之后，在本地找到这个 Package，并将 Package 复制到 DTS 的模板目录下。</p><p>不同的安装环境可能复制的目标目录各有不同。</p><p>本人安装环境是 WIN7 64X + SQL Server 2012 + Visual Studio 2012</p><p>将 Package 复制到以下目录</p><p>C:\Program Files (x86)\Microsoft Visual Studio 10.0\Common7\IDE\PrivateAssemblies\ProjectItems\DataTransformationProject\DataTransformationItems </p><p>部分人的环境可能比较复杂，既安装过 SQL Server 2012 也安装过 2008 或者 2008 R2 并且除了 Visual Studio 2012 也可能安装过其它版本的 Visual Studio，因此可能需要打开各自目录都去尝试下，有人可能适用于</p><p>C:\Program Files (x86)\Microsoft Visual Studio 10.0\Common7\IDE\PrivateAssemblies\ProjectItems\DataTransformationProject\</p><p> <img alt="" height="520" src="http://images.cnitblog.com/blog/477275/201306/20173421-e2fcf85c29544ebaa3acc0952987b63f.x-png" width="768"/></p><p>重启开发工具，我的是 SSDT 以前2008 版本叫BIDS。选中新建的项目 SSISMSDN 右键 -&gt; Add -&gt; New Item, 就会看到如上图所示的 Package 模板。</p><p><img alt="" height="637" src="http://images.cnitblog.com/blog/477275/201306/20173616-119bd8a5394046f28582a88395e8d7ec.x-png" width="762"/></p><p>新建的 Package 可以看到很多控件都已经存在包括数据库连接管理器，所以说非常方便。最后记得将 Package 名字改成你所需要的，并重新生成新的 ID即可。</p><p>除了 SSIS Package 模板之外，可以看到上面提到的目标目录中还有其它的 SSRS，SSAS 目录，虽然没有尝试过 SSRS/SSAS 项目模板，但估计也可以像 SSIS Package 这样来操作。<br/></p>
+</div>]
+</body>
+</html>

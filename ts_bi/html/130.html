@@ -1,0 +1,26 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>表数据之间的同步有很多种实现方式，比如删除然后重新 INSERT，或者写一些其它的分支条件判断再加以 INSERT 或者 UPDATE 等。包括在 SSIS Package 中也可以通过 Lookup、Condition Split 等多种 Task 的组合来实现表数据之间的同步。在这里 "同步" 的意思是指每次执行一段代码的时候能够确保 A 表的数据和 B 表的数据始终相同。</p><p>可以通过 SQL Server 中提供的 Merge 语句来实现，并且还可以将操作的细节记录下来。</p><p>具体的细节内容请参照 - <a href="http://msdn.microsoft.com/zh-cn/library/bb510625.aspx"><u><font color="#0066cc">http://msdn.microsoft.com/zh-cn/library/bb510625.aspx</font></u></a>  我这里只用一个简单的示例来介绍一些它的常见功能。</p><h2 id="articleHeader2">Merge 语句的使用</h2><p>测试表 - 一个 Source 表，一个 Target 表和一个日志记录表，用来记录每次所执行的操作。</p><p>下面是主要的同步操作 </p><p>MERGE INTO - 数据的目的地，将数据最终 MERGE 到的表对象 </p><h3 id="articleHeader3">USING 与源表连接 ON 关联的条件 </h3><ul><li>WHEN MATCHED - 如果匹配成功，即关联条件成功 (这时就应该将 SOURCE 中其它的所有字段值更新到 TARGET 表中) </li><li>WHEN NOTMATCHED BY TARGET - 如果匹配不成功 (TARGET 中没有这一条记录但是 SOURCE 表有，说明 SOURCE 表多了新数据因此应该插入到 TARGET 表中) </li><li>WHEN NOTMATCHED BY SOURCE - 如果匹配不成功 (SOURCE 中没有这一条记录但是 TARGET 表有，说明 SOURCE 表可能把这条数据删除了，所以 TARGET 也应该删除) </li></ul><pre><code><span style="font-size: 13px;"><span style='font-family: "Microsoft Yahei";'>MERGE <span style="color: rgb(0, 0, 255);">INTO</span> <span style="color: rgb(0, 128, 0);">@TargetTable</span> <span style="color: rgb(0, 0, 255);">AS</span> T           <br/>
+USING <span style="color: rgb(0, 128, 0);">@SourceTable</span> <span style="color: rgb(0, 0, 255);">AS</span> S                <br/>
+   <span style="color: rgb(0, 0, 255);">ON</span> T.ID <span style="color: rgb(128, 128, 128);">=</span> S.ID                      <br/>
+<span style="color: rgb(0, 0, 255);">WHEN</span> MATCHED         <br/>
+   <span style="color: rgb(0, 0, 255);">THEN</span> <span style="color: rgb(0, 0, 255);">UPDATE</span> <span style="color: rgb(0, 0, 255);">SET</span> T.DSPT <span style="color: rgb(128, 128, 128);">=</span> S.DSPT  <br/>
+<span style="color: rgb(0, 0, 255);">WHEN</span> <span style="color: rgb(128, 128, 128);">NOT</span> MATCHED <span style="color: rgb(0, 0, 255);">BY</span> TARGET   <br/>
+   <span style="color: rgb(0, 0, 255);">THEN</span> <span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">VALUES</span>(S.ID,S.DSPT)<br/>
+<span style="color: rgb(0, 0, 255);">WHEN</span> <span style="color: rgb(128, 128, 128);">NOT</span> MATCHED <span style="color: rgb(0, 0, 255);">BY</span> SOURCE            <br/>
+   <span style="color: rgb(0, 0, 255);">THEN</span> <span style="color: rgb(0, 0, 255);">DELETE</span><br/>
+OUTPUT $ACTION <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);">ACTION</span><span style="color: rgb(255, 0, 0);">]</span>,<br/>
+   Deleted.ID <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">Deleted ID</span><span style="color: rgb(255, 0, 0);">'</span>,<br/>
+   Deleted.DSPT <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">Deleted Description</span><span style="color: rgb(255, 0, 0);">'</span>,<br/>
+   Inserted.ID <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">Inserted ID</span><span style="color: rgb(255, 0, 0);">'</span>,<br/>
+   Inserted.DSPT <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">Inserted Description</span><span style="color: rgb(255, 0, 0);">'</span><br/>
+<span style="color: rgb(0, 0, 255);">INTO</span> <span style="color: rgb(0, 128, 0);">@Log</span>;</span></span></code></pre><h3 id="articleHeader4">限制条件</h3><ul><li>在 Merge Matched 操作中，只能允许执行 UPDATE 或者 DELETE 语句。</li><li>在 Merge Not Matched 操作中，只允许执行 INSERT 语句。</li><li>一个 Merge 语句中出现的 Matched 操作，只能出现一次 UPDATE 或者 DELETE 语句，否则就会出现下面的错误 - <span style="color: rgb(255, 0, 0);">An action of type 'WHEN MATCHED' cannot appear more than once in a 'UPDATE' clause of a MERGE statement.</span></li><li>Merge 语句最后必须包含分号，以 ; 结束。</li></ul><p>执行一下上面的 MERGE 语句查看一下结果，两个表的数据一模一样了 -</p><p>ID = 1,2,3 的记录在 Source 表和Target 表都存在，因此执行的是 UPDATE 操作。</p><p>ID = 4，5 的记录在 Source 表存在，但是在 Target 表不存在，因此执行的是 INSERT 操作。</p><p>ID = 6，7 的记录在 Target 表存在，但是在 Source 表不存在，因此执行的是 DELETE 操作。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201310/15151940-9c6ec4a656104898a95746addcf0830f.png"/><br/><br/></p>
+</div>]
+</body>
+</html>

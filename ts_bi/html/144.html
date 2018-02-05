@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">错误信息</h2><p>关于 WMI Provider 不能连接的错误 - Cannot connect to WMI provider. You do not have permission or the server is unreachable.</p><h2 id="articleHeader2">解决方式</h2><p>原本在电脑上装过 SQL Server 2008 R2, 后来升级到了 SQL Server 2012, 有时因为需要使用2008 也有时需要使用 2012, 每次打开 Configuration Manager 时就会出现这个错误:</p><p>When opening SQL Server Configuration Manager, seeing this error below:</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201301/06173924-70c7cb3c31814ee3a4df130997b6330b.png"/></p><p>方法是如果是 2008 R2 的 Configuration Manager 打不开对应的应该找 100 的版本, 如果是 2012 的Configuration Manager 打不开就应该进入 110的目录</p><p>我目前是打开 2008 R2  所以进入到 100 的目录, 并且  CMD 最好使用 右键 - 以管理员身份运行</p><p>Solution, go the folder "C:\Program Files (x86)\Microsoft SQL Server\<span style="color: rgb(255, 0, 0);"><strong>100</strong></span>\Shared" and run this command as an Administrator</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201301/06173940-01bd505e9df0467fbe6c89385405d853.png"/></p><p>进入指定目录, 运行以下命令:</p><p>mofcomp sqlmgmproviderxpsp2up.mof</p><p>DONE!</p>
+</div>]
+</body>
+</html>

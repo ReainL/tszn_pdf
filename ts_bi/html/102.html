@@ -1,0 +1,429 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>这一章节主要用到的 MDX 函数：</p><ul><li>PeriodsToDate( [Level , [Member]] ) - 从指定级别的范围内，返回与指定成员同一级别，从第一个期间开始到指定成员结束的期间集。</li><li>Ytd( [Member] )</li><li>Qtd( [Member] )</li><li>Mtd( [Member] )</li><li>Wtd( [Member] )</li><li>LastPeriods( n [, Member] )  - 返回从比指定成员表达式滞后 n - 1 个位置的成员开始，到指定成员为止的期间集。</li><li>ParallelPeriod( [Level [,n [, Member]]] ) - 在指定级别处指定成员的祖先，查找指定滞后的该祖先的同级，返回该同级后代中指定成员的并行期间。</li><li>OpeningPeriod( [Level [, Member]] ) / ClosingPeriod ( [Level [, Member]] ) - 返回指定级别上的默认成员的后代中的第一个/最后一个同级。</li></ul><p>主要实现和讲解的内容：Year to date 的 Running Total, 同比，环比 等计算方式。</p><h2 id="articleHeader2">时间函数</h2><p>时间在商业分析过程中是必不可缺的一环，分析人员一般会基于现在这个时间点对业务的分析，或者回顾之前某个时间点然后对未来某个时间点的数据做出预测或者估计。在分析服务中有一系列的时间函数可以帮助大家更好的处理和分析 SSAS 数据库中的数据。</p><p>作为时间维度的核心，一个或者多个用户自定义的层次结构对日历做出了分解。在这个日历上你可以从高级别的粒度比如说年钻取到低级别的粒度比如说季度，月和天这些时间点上。下面的这幅图上就显示了基于标准日历的一个层次结构 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21163736-c89a49689ce54b5da7a00c3246ad1004.png"/></p><h2 id="articleHeader3">计算累加值</h2><p>在分析业务中，度量值常用来表示某些累加值。比如说 10月份的 零售额 Reseller Sales，单独来看这个数据可能还是比较有用的，但是更有用的信息可能还是用户想知道从今年年初到10月份 (包括10月份) 的所有零售额是多少，因为他需要知道总零售额和今年的预期目标还有多少差距。</p><p>因此，可以通过这样的时间函数来实现这样的累加值的计算。</p><p>PeriodsToDate( [Level , [Member]] )</p><ul><li>从指定级别的范围内，返回与指定成员处于同一级别，从第一个期间开始到指定成员结束的期间集。</li><li>如果指定了级别，则层次结构的当前成员就是指 Hierarchy， CurrentMember, 其中 Hierarchy 是指定级别的层次结构。</li><li>如果又没有指定级别又没有指定成员，那么该级别是度量值组中 Time 类型的第一个维度上第一个层次结构的当前成员的父级。</li></ul><p>下面这个例子中通过 PeriodsToDate 函数的第一个参数定义了时间的级别是 [Date].[Calendar].[Calendar Year]，比如 CY 2002, CY2003，第二个参数的成员必须都是从这个级别往下的范围来取。比如第二个参数是 [Date].[Calendar].[Month].[April 2002] 很显然第二个参数透露出来的它的 CY 是指2002，那么这个 PeriodsToDate 的计算日期范围就是 CY 2002年的第一个月到 CY 2002的第四个月。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{<br/>
+  PeriodsToDate(<br/>
+     [Date].[Calendar].[Calendar Year],<br/>
+     [Date].[Calendar].[Month].[April 2002]<br/>
+  )<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21163952-9d8c0c6ac3674643a0911cbb6872e577.png"/></p><p>从分析服务的角度来看这个过程，在这个函数中所使用的级别是 Calendar 层次结构中的 Calendar Year ，因此分析服务从成员 April 2002 开始沿着这个级别朝着它的祖先来移动并到达 CY 2002。这时因为通过 [Date].[Calendar].[Month].[April 2002] 得知要取的成员位于 Month 级别下，因此分析服务通过获取在 Month 级别下 CY 2002 成员的第一个直系亲属再次定义到一个成员 -  January 2002，那么接着把从 January 2002 到 April 2002 这一段成员再通过 [Date].[Calendar].[Month].[January 2002]:[Date].[Calendar].[Month].[April 2002] 得到这样的一个集合。</p><p>上面的这个例子演示了  PeriodsToDate 这样的一个函数，但是我们所需要做的是这种 Running Total， Year-To-Date Total 的效果，我们先看看自然月的情况。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{[Date].[Calendar].[Month].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21164036-9adfdb6618e74e07b3711ca9f5f1271d.png"/></p><p>我们可以按照年，季度，月等实现 Running total 的计算。</p><pre><code>WITH<br/>
+-- Running total<br/>
+MEMBER [Measures].[Reseller Running Total]<br/>
+AS<br/>
+AGGREGATE(<br/>
+PERIODSTODATE([Date].[Calendar].[(All)],<br/>
+  [Date].[Calendar].CurrentMember<br/>
+),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+-- Running total for Year<br/>
+MEMBER [Measures].[Reseller Running Total Year]<br/>
+AS<br/>
+AGGREGATE(<br/>
+PERIODSTODATE([Date].[Calendar].[Calendar Year],<br/>
+[Date].[Calendar].CurrentMember<br/>
+),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+-- Running total for Semester<br/>
+MEMBER [Measures].[Reseller Running Total Semester]<br/>
+AS<br/>
+AGGREGATE(<br/>
+PERIODSTODATE([Date].[Calendar].[Calendar Semester],<br/>
+[Date].[Calendar].CurrentMember<br/>
+),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+-- Running total for Quarter<br/>
+MEMBER [Measures].[Reseller Running Total Quarter]<br/>
+AS<br/>
+AGGREGATE(<br/>
+PERIODSTODATE([Date].[Calendar].[Calendar Quarter],<br/>
+[Date].[Calendar].CurrentMember<br/>
+),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+SELECT<br/>
+{<br/>
+([Measures].[Reseller Sales Amount]),<br/>
+([Measures].[Reseller Running Total]),<br/>
+([Measures].[Reseller Running Total Year]),<br/>
+([Measures].[Reseller Running Total Semester]),<br/>
+([Measures].[Reseller Running Total Quarter]) <br/>
+} ON COLUMNS,<br/>
+{[Date].[Calendar].[Month].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" height="298" src="http://images.cnitblog.com/blog/477275/201311/21164157-e8b3fcf0fbde401688d72e27abe97f23.png" width="912"/></p><h2 id="articleHeader4">简化了的 Periods To Date 的计算</h2><p>实际上在大多数的时间维度设计过程中，一些时间属性例如年，季度，月，周都已经被预先定义好了。因此在使用 Periods To Date 计算这些时间点的时候，可以用更加简单的方式来表达 Year to date, quarter to date, month to date 和 week to date 等，这样就不再需要一定要指定 Calendary 级别了。</p><ul><li>Ytd( [Member] )</li><li>Qtd( [Member] )</li><li>Mtd( [Member] )</li><li>Wtd( [Member] )</li></ul><pre><code>WITH<br/>
+-- Running total<br/>
+MEMBER [Measures].[Reseller Running Total]<br/>
+AS<br/>
+AGGREGATE(<br/>
+PERIODSTODATE([Date].[Calendar].[(All)],<br/>
+  [Date].[Calendar].CurrentMember<br/>
+ ),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+-- Running total for Year<br/>
+MEMBER [Measures].[Reseller Running Total Year]<br/>
+AS<br/>
+AGGREGATE(<br/>
+YTD([Date].[Calendar].CurrentMember ),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+-- Running total for Quarter<br/>
+MEMBER [Measures].[Reseller Running Total Quarter]<br/>
+AS<br/>
+AGGREGATE(<br/>
+QTD([Date].[Calendar].CurrentMember ),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+SELECT<br/>
+{<br/>
+   ([Measures].[Reseller Sales Amount]),<br/>
+   ([Measures].[Reseller Running Total]),<br/>
+   ([Measures].[Reseller Running Total Year]), <br/>
+   ([Measures].[Reseller Running Total Quarter]) <br/>
+} ON COLUMNS,<br/>
+{[Date].[Calendar].[Month].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21164339-72be570ead4f488185f190c084c47545.png"/></p><p>在上面的两个例子中要注意到这个成员的定义，通过使用 [(All)] 这个虚拟的级别来表示取的是 [Date].[Calendar] 范围下所有的时间，打破了年或者季度级别的限制的一个 Running Total。</p><pre><code>WITH<br/>
+-- Running total<br/>
+MEMBER [Measures].[Reseller Running Total]<br/>
+AS<br/>
+AGGREGATE(<br/>
+PERIODSTODATE([Date].[Calendar].[(All)],<br/>
+  [Date].[Calendar].CurrentMember<br/>
+ ),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)</code></pre><p>这种写法本身是合法的没有任何问题，但是很多 MDX 开发者可能会选择另外的一种捷径：</p><p>NULL: [Date].[Calendar].CurrentMember</p><p>NULL 成员的引用使得分析服务去计算并返回从当前成员所在级别上的第一个成员到当前成员这样的一个范围，这样就省去了 PERIODSTODATE 这个函数，当然效果也完全是一样的。</p><pre><code>WITH<br/>
+-- Running total<br/>
+MEMBER [Measures].[Reseller Running Total]<br/>
+AS<br/>
+AGGREGATE(<br/>
+PERIODSTODATE([Date].[Calendar].[(All)],<br/>
+  [Date].[Calendar].CurrentMember<br/>
+ ),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+-- Running total From NULL<br/>
+MEMBER [Measures].[Reseller Running Total From NULL]<br/>
+AS<br/>
+AGGREGATE(<br/>
+(NULL:[Date].[Calendar].CurrentMember),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+SELECT<br/>
+{<br/>
+   ([Measures].[Reseller Sales Amount]),<br/>
+   ([Measures].[Reseller Running Total]),<br/>
+   ([Reseller Running Total From NULL]) <br/>
+} ON COLUMNS,<br/>
+{[Date].[Calendar].[Month].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21164538-9ccec2aa8a1c4cd5b69ee2e18344944c.png"/></p><h2 id="articleHeader5">计算累加平均值</h2><p>可以使用到这个函数 LastPeriods( n [, Member] )</p><ul><li>如果指定的期间数为正数，那么 LastPeriods 返回一个成员集，其中的成员从比指定成员表达式滞后 n - 1 个位置的成员开始，到指定成员为止。返回的成员数就是 n。</li><li>如果指定的期间数为负，那么 LastPeriods 返回一个成员集，其中的成员从指定的成员开始，到比指定的成员超前 n - 1 个位置的成员为止。</li><li>如果指定的期间数位零，那么 LastPeriods 返回空集。</li></ul><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{<br/>
+           LastPeriods(<br/>
+                             3,<br/>
+                            [Date].[Calendar].[Month].[January 2002]<br/>
+                           )<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p>返回 2002年1月份之前前两个月和包含自身的 Reseller Sales Amount 值。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21164726-57ac72e11a7d487cbd517964bda4d796.png"/></p><p>如果返回之后的几个月就是像这样改一下 -</p><pre><code>{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{<br/>
+LastPeriods(<br/>
+ -3,<br/>
+ [Date].[Calendar].[Month].[January 2002]<br/>
+   )<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21164823-d078d2fa3b1049e3a66b0b928e83f56d.png"/></p><p>下面这个例子展示了累加平均值，计算含当前月前三个月的平均 Reseller Sales Amount。</p><pre><code>WITH MEMBER [Measures].[Running Total Reseller Sales Amount of Previous 3 Month]<br/>
+AS<br/>
+AGGREGATE(<br/>
+ LastPeriods(3, [Date].[Calendar].CurrentMember),<br/>
+ ([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+MEMBER [Measures].[Avg Reseller Sales Amount of Previous 3 Month]<br/>
+AS<br/>
+AVG(<br/>
+ LastPeriods(3, [Date].[Calendar].CurrentMember),<br/>
+ ([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+SELECT<br/>
+{<br/>
+  ([Measures].[Reseller Sales Amount]),<br/>
+  ([Measures].[Running Total Reseller Sales Amount of Previous 3 Month]),<br/>
+  ([Measures].[Avg Reseller Sales Amount of Previous 3 Month])<br/>
+} ON COLUMNS,<br/>
+{<br/>
+[Date].[Calendar].[Month].MEMBERS<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21164956-295d460b1c684c39a5eddb7ca9d53b09.png"/></p><h2 id="articleHeader6">关于上期比(Period Over Period)的分析</h2><p>在数据分析中历史数据经常拿来和当前数据进行对比分析，在这里先了解两个概念同比和环比。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21165033-838df64ae5ec4e97b73302748d7a682f.png"/></p><p>同比 - 同期相比，比较的是当前时期与比如说上一年同时期的数据对比，这样就能比较一个相对数据变化。比如说今年8月份的销售额是1000万美金，同比上一年的7000W美金增长了1000W美金，或者用百分比表示。</p><p>环比 - 与相连的上一期进行对比。如果比较的周期是周，环比就是本周比上周的；如果比较的周期是月，那么环比就是本月比上一个月；同样如果比较的周期是年，那么就是当年比上一年。如果用倍数计算要得到环比增长率，那么就是 (当前周期 - (当前周期 - 1)) / (当前周期 - 1)  最后得到一个结果乘以 100% 就可以了。</p><p>环比还是用的非常多的，因为它能够表明某现象的逐期发展速度。比如2月比1月，3月比2月，4月比3月…12月比11月，它能够说明逐月的发展速度。比如在分析抗击非典期间某些经济现象的发展趋势，环比比同比更能说明问题。</p><p>我们可以通过 ParallelPeriod 函数来实现同比，它返回上一期间具有与指定成员相同的相对位置的成员。</p><p>ParallelPeriod( [Level [,n [, Member]]] )</p><ul><li>在指定级别处获取指定成员的祖先，然后查找具有指定滞后的该祖先的同级，最后返回该同级后代中指定成员的并行期间。</li><li>如果没有指定级别表达式，也没有指定成员表达式，则默认成员值为度量值组中类型为 Time 的第一个维度上第一个层次结构的当前成员。</li><li>如果指定了级别表达式，但未指定成员表达式，则默认成员值为 Level_Expression.Hierarchy.CurrentMember。</li><li>默认索引值为1。</li><li>默认级别为指定成员的父成员。</li></ul><p>先来回顾一下这个例子 - 获取 CY 2003年各个月份的 Reseller Sales Amount。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{<br/>
+Descendants(<br/>
+[Date].[Calendar].[Calendar Year].[CY 2003],<br/>
+[Date].[Calendar].[Month],<br/>
+SELF<br/>
+)<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21165154-d35dc72aca184abab6e83b253c7cee2b.png"/></p><p>再来通过 ParallelPeriod 获取一个以年为单位的同比对象。</p><pre><code>WITH<br/>
+MEMBER [Measures].[x] AS<br/>
+ParallelPeriod(<br/>
+[Date].[Calendar].[Calendar Year],<br/>
+1,<br/>
+[Date].[Calendar].CurrentMember<br/>
+).Name<br/>
+SELECT<br/>
+{<br/>
+([Measures].[Reseller Sales Amount]),<br/>
+([Measures].[x])<br/>
+} ON COLUMNS,<br/>
+{<br/>
+Descendants(<br/>
+[Date].[Calendar].[Calendar Year].[CY 2003],<br/>
+[Date].[Calendar].[Month],<br/>
+SELF<br/>
+)<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21165249-11155df8fd464964a3623f4f1267a69a.png"/></p><p>[Date].[Calendar].CurrentMember 在查询中指的就是 CY 2003年的 Month 级别下的对象，以 CY2003 1月为例，首先因为级别定义的是 [Date].[Calendar].[Calendar Year]，因此首先要通过 CY 2003 年1月这个对象找到它的年祖先也就是 CY2003。</p><p>第二个参数 1 表示往前推 1 个时期单位，这个时期单位在第一个参数也给出了，因此就是 CY 2003 的上一年即 CY 2002。找到这个 CY 2002 之后来取得与原对象相同级别下的成员，即 CY 2002 1月这个对象。</p><pre><code>ParallelPeriod(<br/>
+[Date].[Calendar].[Calendar Year],<br/>
+1,<br/>
+[Date].[Calendar].CurrentMember<br/>
+).Name</code></pre><p>理解了这些概念之后，我们就可以基于 CY 2003年中的月来获取它们的同比数据。</p><pre><code>WITH<br/>
+MEMBER [Measures].[Prior Period Reseller Sales Amount] AS<br/>
+(<br/>
+ParallelPeriod(<br/>
+[Date].[Calendar].[Calendar Year],<br/>
+1,<br/>
+[Date].[Calendar].CurrentMember<br/>
+  ),<br/>
+[Measures].[Reseller Sales Amount]<br/>
+)<br/>
+,FORMAT="Currency"<br/>
+SELECT<br/>
+{<br/>
+([Measures].[Reseller Sales Amount]),<br/>
+([Measures].[Prior Period Reseller Sales Amount])<br/>
+} ON COLUMNS,<br/>
+{<br/>
+Descendants(<br/>
+ [Date].[Calendar].[Calendar Year].[CY 2003],<br/>
+ [Date].[Calendar].[Month],<br/>
+ SELF<br/>
+)<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21165430-9481a19573334e948324cce5c6a48c92.png"/></p><p>当然我们更应该计算一下同比率 -  (当前日期数据 - 同比时期数据) / 同比时期数据</p><pre><code>WITH<br/>
+MEMBER [Measures].[Prior Period Reseller Sales Amount] AS<br/>
+(<br/>
+ParallelPeriod(<br/>
+[Date].[Calendar].[Calendar Year],<br/>
+1,<br/>
+[Date].[Calendar].CurrentMember<br/>
+),<br/>
+[Measures].[Reseller Sales Amount]<br/>
+)<br/>
+,FORMAT="Currency"<br/>
+MEMBER [Measures].[Prior Period Growth] AS<br/>
+(<br/>
+([Measures].[Reseller Sales Amount])-([Measures].[Prior Period Reseller Sales Amount])<br/>
+)<br/>
+/<br/>
+([Measures].[Prior Period Reseller Sales Amount])<br/>
+,FORMAT="Percent"<br/>
+SELECT<br/>
+{<br/>
+([Measures].[Reseller Sales Amount]),<br/>
+([Measures].[Prior Period Reseller Sales Amount]),<br/>
+([Measures].[Prior Period Growth])<br/>
+} ON COLUMNS,<br/>
+{<br/>
+Descendants(<br/>
+[Date].[Calendar].[Calendar Year].[CY 2003],<br/>
+[Date].[Calendar].[Month],<br/>
+SELF<br/>
+)<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21165539-a524daa0b9274ebc819a6e10873bba65.png"/></p><p>再来通过前面学习到的一个函数来完成一个按月份的环比查询。</p><pre><code>WITH<br/>
+MEMBER [Measures].[Prior Month Reseller Sales Amount] AS<br/>
+(<br/>
+(LASTPERIODS(2,[Date].[Calendar].CurrentMember).Item(0),[Measures].[Reseller Sales Amount])<br/>
+)<br/>
+,FORMAT="Currency"<br/>
+MEMBER [Measures].[Prior Period Growth] AS<br/>
+(<br/>
+([Measures].[Reseller Sales Amount] - [Measures].[Prior Month Reseller Sales Amount])<br/>
+/<br/>
+([Measures].[Prior Month Reseller Sales Amount])<br/>
+)<br/>
+,FORMAT="Percent"<br/>
+SELECT<br/>
+{<br/>
+([Measures].[Reseller Sales Amount]),<br/>
+([Measures].[Prior Month Reseller Sales Amount]),<br/>
+([Measures].[Prior Period Growth])<br/>
+} ON COLUMNS,<br/>
+{<br/>
+Descendants(<br/>
+[Date].[Calendar].[Calendar Year].[CY 2003],<br/>
+[Date].[Calendar].[Month],<br/>
+SELF<br/>
+)<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21165646-c2bf52d3b3e541af91c2ec3ca341d7d3.png"/></p><h2 id="articleHeader7">要注意的地方</h2><p>实际上基于时间的 MDX 函数并不是说它们在使用过程中能够感知和理解时间，实际上也可以通过导航来实现它们的一些功能。例如下面这个逻辑就是取得 2003年所有月份与上一年所有月份的 Reseller Sales Amount，这样就可以很容易的实现同比。</p><pre><code>WITH<br/>
+MEMBER [Measures].[x] AS<br/>
+Cousin(<br/>
+[Date].[Calendar].CurrentMember,<br/>
+Ancestor(<br/>
+[Date].[Calendar].CurrentMember,<br/>
+[Date].[Calendar].[Calendar Year]<br/>
+).Lag(1)<br/>
+).Name<br/>
+SELECT<br/>
+{<br/>
+([Measures].[Reseller Sales Amount]),<br/>
+([Measures].[x])<br/>
+} ON COLUMNS,<br/>
+{<br/>
+Descendants(<br/>
+[Date].[Calendar].[Calendar Year].[CY 2003],<br/>
+[Date].[Calendar].[Month],<br/>
+SELF<br/>
+)<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21165756-f01a98f7622f44a899bad197e741e98c.png"/></p><p>再来看这个例子 -</p><pre><code>WITH<br/>
+MEMBER [Measures].[x] AS<br/>
+ParallelPeriod(<br/>
+[Date].[Calendar].[Calendar Year],<br/>
+1,<br/>
+[Date].[Calendar].CurrentMember<br/>
+).Name<br/>
+SELECT<br/>
+{<br/>
+([Measures].[Reseller Sales Amount]),<br/>
+([Measures].[x])<br/>
+} ON COLUMNS,<br/>
+{<br/>
+Descendants(<br/>
+[Date].[Calendar].[Calendar Year].[CY 2002],<br/>
+[Date].[Calendar].[Month],<br/>
+SELF<br/>
+)<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p>按照我们的理解 x 中的对象应该是 January 2001 , February 2001 …. 按照这样排下去，正好是一个同比的场景。NULL ? 为什么呢？</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21165852-b625c886c4e442438ebf5b68517ccb9a.png"/></p><p>但是快速的查询一下 CY 2001 的 Month 成员后就明白了这个原因，因为在 CY 2001 年中， July 2001 是第一个成员。并且到了 December 2001 的时候就结束了，因此这个时期指定了只能在 CY 2002 - 1 即 CY 2001 这个范围来取，这样就会造成后面的成员都是 NULL。当然我们也没有办法直接可以解决这样的一个问题，所以对于这样的问题是在开发过程中更要注意的，要知道我们查询对象的边界范围有多大。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21170005-ffc424c7a55d4acb9caf4bd15a577f51.png"/></p><h2 id="articleHeader8">Combining Time-Based Metrics 结合时间指标</h2><p>还是先写一个比较简单的查询 - CY 2003 年各个月份的 Reseller Sales Amount 。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21170028-c6246c488fb54565b00396bbf4eac0f4.png"/></p><p>然后继续看看之前的一个例子 - 根据月份做的一个 Running Total 。</p><pre><code>WITH<br/>
+MEMBER [Measures].[Year to Date Reseller Sales] AS<br/>
+Aggregate(<br/>
+PeriodsToDate(<br/>
+[Date].[Calendar].[Calendar Year],<br/>
+[Date].[Calendar].CurrentMember<br/>
+),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+,FORMAT="Currency"<br/>
+SELECT<br/>
+{<br/>
+([Measures].[Reseller Sales Amount]),<br/>
+([Measures].[Year to Date Reseller Sales])<br/>
+} ON COLUMNS,<br/>
+{<br/>
+Descendants(<br/>
+[Date].[Calendar].[CY 2003],<br/>
+[Date].[Calendar].[Month],<br/>
+SELF<br/>
+)<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21170120-28753d43e8804ff8bfe33430f7f5deff.png"/></p><p>改造一下加上上一年的 Year To Date 的 Running Total。</p><pre><code>WITH<br/>
+MEMBER [Measures].[Prior Period Year to Date Reseller Sales] AS<br/>
+(<br/>
+ParallelPeriod(<br/>
+[Date].[Calendar].[Calendar Year],<br/>
+1,<br/>
+[Date].[Calendar].CurrentMember<br/>
+),<br/>
+[Measures].[Year to Date Reseller Sales]<br/>
+)<br/>
+,FORMAT="Currency"<br/>
+MEMBER [Measures].[Year to Date Reseller Sales] AS<br/>
+Aggregate(<br/>
+PeriodsToDate(<br/>
+[Date].[Calendar].[Calendar Year],<br/>
+[Date].[Calendar].CurrentMember<br/>
+),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+,FORMAT="Currency"<br/>
+SELECT<br/>
+{<br/>
+([Measures].[Reseller Sales Amount]),<br/>
+([Measures].[Year to Date Reseller Sales]),<br/>
+([Measures].[Prior Period Year to Date Reseller Sales])<br/>
+} ON COLUMNS,<br/>
+{<br/>
+Descendants(<br/>
+[Date].[Calendar].[CY 2003],<br/>
+[Date].[Calendar].[Month],<br/>
+SELF<br/>
+)<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21170230-a45dc15d4c6846c38a1a4e101a59b358.png"/></p><p>看起来可能比较复杂，但是解释一下就全明白了。</p><pre><code>MEMBER [Measures].[Year to Date Reseller Sales] AS<br/>
+Aggregate(<br/>
+PeriodsToDate(<br/>
+[Date].[Calendar].[Calendar Year],<br/>
+[Date].[Calendar].CurrentMember<br/>
+),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+,FORMAT="Currency"</code></pre><p>这个计算成员求的就是 Year To Date 的 Running Total，那么用在 ROWS 轴上 CY 2003 的时候就是求的 CY 2003 各个月的 Running Total，那么因为这段代码中因为 ParallelPeriod 已经得到 CY 2003 同比的对象了，因此加上 </p><p>[Measures].[Year to Date Reseller Sales] 说明的就是 CY 2003 同比对象即 CY 2002 的 Running Total。</p><pre><code>ParallelPeriod(<br/>
+[Date].[Calendar].[Calendar Year],<br/>
+1,<br/>
+[Date].[Calendar].CurrentMember<br/>
+),<br/>
+[Measures].[Year to Date Reseller Sales]</code></pre><p>我们可以验证一下，直接查询 CY 2002 各个月的 Running Total。</p><pre><code>WITH<br/>
+MEMBER [Measures].[Year to Date Reseller Sales] AS<br/>
+Aggregate(<br/>
+PeriodsToDate(<br/>
+[Date].[Calendar].[Calendar Year],<br/>
+[Date].[Calendar].CurrentMember<br/>
+),<br/>
+([Measures].[Reseller Sales Amount])<br/>
+)<br/>
+,FORMAT="Currency"<br/>
+SELECT<br/>
+{<br/>
+([Measures].[Reseller Sales Amount]),<br/>
+([Measures].[Year to Date Reseller Sales]) <br/>
+} ON COLUMNS,<br/>
+{<br/>
+Descendants(<br/>
+[Date].[Calendar].[CY 2002],<br/>
+[Date].[Calendar].[Month],<br/>
+SELF<br/>
+)<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p>和上图对比一下，看看 CY 2002 的 Running Total 是否也一样？</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21170429-bf38b26eff41464598320d1b7b20158c.png"/> </p><h2 id="articleHeader9">OpeningPeriod 和ClosingPeriod 函数</h2><p>最后来看看这两个函数，它们主要用于实践维度，当然也可以用在其它维度，它主要处理半累加 (semi-additive)的度量值。</p><p>OpeningPeriod( [Level [, Member]] ) / ClosingPeriod ( [Level [, Member]] )</p><ul><li>如果指定了级别表达式，则函数使用包含指定级别的层次结构，返回指定级别上的默认成员的后代中的第一个/最后一个同级。</li><li>如果指定了级别表达式和成员表达式，则返回包含指定级别的层次结构中位于指定级别上指定成员后代中的第一个/最后一个同级。</li><li>如果既不指定级别表达式也不指定成员表达式，则函数使用默认级别和时间类型维度的成员。</li></ul><p>例如，一天结束时的汇率应该取的是这个时期里最后一个非空的对象，那反过来想知道这个时期最开始的一个 End-Of-Day 汇率的话就可以使用 OpeningPeriod 函数来计算了。</p><pre><code>WITH<br/>
+MEMBER [Measures].[First Child Rate] AS<br/>
+(<br/>
+OpeningPeriod(<br/>
+[Date].[Calendar].[Date],<br/>
+[Date].[Calendar].CurrentMember<br/>
+),<br/>
+[Measures].[End of Day Rate]<br/>
+)<br/>
+,FORMAT="Standard"<br/>
+SELECT<br/>
+{<br/>
+([Measures].[First Child Rate]),<br/>
+([Measures].[End of Day Rate])<br/>
+} ON COLUMNS,<br/>
+{[Date].[Calendar].Members} ON ROWS<br/>
+FROM [Step-by-Step]<br/>
+WHERE ([Destination Currency].[Destination Currency].[Euro])</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201311/21170605-f68ba6ad1a8849aab37ab6c55858b099.png"/></p><p>实际上这个例子中， End Of Day Rate 汇率已经在 Cube 中早就计算好了，但是一段时间内比如说一天之内这个汇率就有可能会发生很多次变化。比如说在上午10点汇率是 1.03 那么在那个时间点 End Of Day Rate 就是1.03。到了下午汇率变成了 1.02，那么 End Of Day Rate 就会变成1.02。</p>
+</div>]
+</body>
+</html>

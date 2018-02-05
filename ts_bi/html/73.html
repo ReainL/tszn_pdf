@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<p>当 Pie Chart 页面标签过多的时候，往往数字标签内容挤做一团。我们要做的是：第一，让标签在饼图外部显示；第二，不让标签重叠。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201405/071033531045277.png"/></p><p>一种做法是通过修改数字标签属性 - Series Label Properties</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201405/071035215882744.png"/></p><p>将 Position 属性修改为 Outside。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201405/071035323073851.png"/></p><p>但是还有一种方式可供选择，选中饼图本身，修改其 CustomerAttributes 的属性，将 PieLabelStyle 设置成 Outside, 并可以指定线的颜色。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201405/071038591209732.png"/></p><p>保存并预览，第一个问题已经解决了，标签都是在饼图外部显示了。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201405/071040038543610.png"/></p><p>选中图表区，编辑 Chart Area Properties。启用 3D 效果，但是同时将角度都设置成 0， 就还是二维的表现方式。当然，也可以保留默认值，以 3D 效果来显示。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201405/071043084795647.png"/></p><p>以下是 3D 效果，即保留默认值的情况。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201405/071045090883895.png"/><br/></p>
+</div>]
+</body>
+</html>

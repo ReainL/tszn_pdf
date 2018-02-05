@@ -1,0 +1,23 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>Web Service 的用途非常广几乎无处不在，像各大门户网站上的天气预报使用到的第三方 Web Service API，像手机客户端和服务器端的交互等都可以通过事先设计好的 Web Service 接口来实现两个不同平台的信息沟通。</p><p>记得第一次做 IPhone 手机客户端与服务器端交互的 Web Service 接口的时候，由于我们在客户端开发和服务器端开发都没有 IOS 平台开发经验，白天有其它的项目，只能利用晚上的时间不断尝试。最终在第三个通宵的时候，尝试搭建的第3套不同版本的 Web Service 接口终于和 IPhone 手机客户端成功通讯交互。前两套 Web Service 接口可以交互，但是在图片和有些个别地方总有丢数据的情况，所以 Web Service 给我带来的痛苦熬夜经历还是记忆犹新。那时还很单纯，说让加班就加班，玩命表现…不过很享受“尝试，失败！再尝试，再推进，再失败！再尝试，再推进，再失败，再推进，成功！！！”“有问题，出现问题一定能解决，再怎么不能解决，最终一定也能解决！”的决心和过程。</p><p>后来在一个美国某保险公司的 BI项目中也使用到了 Web Service, 其原因是美国一个保险公司对于他们的客户信息的隐私保护，还涉及到一些非常敏感的资金结算等业务，这些信息他们不会轻易开放给开发者。因为有一些非常敏感的业务涉及到客户公司的内部财务结算还有用户账户等信息都是通过客户 IT 部门提供的 Web Service 接口来实现的。</p><h2 id="articleHeader2">实现过程</h2><p>调用的过程实现起来非常的简单，下面使用美国的一个 ZIP Code Web Service 接口来获取指定 ZIP Code 的地区信息。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201309/17213511-14df30c510364ddc81844c0df0b20521.png"/></p><p><a href="http://www.webservicex.net/uszip.asmx?op=GetInfoByZIP"><u><font color="#0066cc">http://www.webservicex.net/uszip.asmx?op=GetInfoByZIP</font></u></a> </p><p>输入 US Zip Code，例如 54404 提交后就能看到返回的一个 XML 格式的结果。Wisconsin 州的 Marshfield, 美国中北部的一个小镇。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201309/17213552-5615187d392d4bb7bef9a88c0b40cc47.png"/></p><p>下面演示在 SSIS 中使用 Web Service 接口，传人指定的参数返回相应的结果。</p><p>首先，新建一个 HTTP Connection Manager 这个连接的作用是用来连接到 WSDL（Web Services Description Language）的 XML 描述页面。这个页面提供了 Web Service API 接口，还有一些参数和返回值的约定。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201309/17213607-736642572b804bb79ba6e8db12cb94a3.png"/></p><p>这里 Web Service 接口的安全性配置可以忽略，但是在实际大多数项目中对 Web Service 接口的使用都用用户验证的。</p><p>看看这个WSDL描述文件 - <a href="http://www.webservicex.net/uszip.asmx?WSDL"><u><font color="#0066cc">http://www.webservicex.net/uszip.asmx?WSDL</font></u></a></p><p><u><font color="#0066cc"><img alt="" src="http://images.cnitblog.com/blog/477275/201309/17213625-a57a7ce576e1463c9d7e7e20c25a0b52.png"/></font></u></p><p>我们将在后面使用到这个 Service - USZip 以及它下面的接口方法。</p><p>新建一个 Web Service Task，指定刚创建的 HttpConnection。</p><p>WSDLFile 这里先创建一个新的空白的 wsdl 文件，然后在这里指向这个文件。</p><p>OverwriteWSDLFile - True, 允许覆盖。</p><p>一定要记得点击 Download WSDL ，这样就会把上面看到的 XML 信息下载并保存到指定的 WSDL 文件中。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201309/17213648-97604c3543ff49b58ff5a676e1bbc87f.png"/></p><p>切换到 Input 选项选择输入的接口方法和参数。Service 选项会列出所有的服务，服务下面会提供方法，当选择完方法后会显示出每个方法需要的参数和类型。在这里我选择的是 GetInfoByZip 方法，它有一个输入参数，字符串类型，我使用自定义的变量 VarZipCode 来作为参数传递到 Web Service 接口中。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201309/17213711-8cd508402ec745218ddd853f422c010e.png"/></p><p> </p><p>Output 是一个 string 类型的变量，用它来接受 Web Service 接口返回的 XML 格式字符串，里面包含了有关城市和州的信息。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201309/17213725-1ee5fca6b0394a0d9a23d112db60e073.png"/></p><p>下面先创建一张表，用它来保存通过 ZipCode查询返回的信息。</p><pre><code>IF OBJECT_ID('DEMO_WS_USRegion') IS NOT NULL<br/>
+DROP TABLE DEMO_WS_USRegion<br/>
+GO<br/>
+<br/>
+CREATE TABLE DEMO_WS_USRegion<br/>
+(<br/>
+   ZipCode NVARCHAR(255),<br/>
+   AreaCode NVARCHAR(255),<br/>
+   [State] NVARCHAR(255),<br/>
+   City NVARCHAR(255),<br/>
+   TimeZone NVARCHAR(255)<br/>
+)</code></pre><p> </p><p>创建一个 Data Flow, 选择一个 XML Source 并进行编辑。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201309/17213830-01fab781096f4318beeba63fcd358857.png"/></p><p>在进行这一步之前，一般的操作是在上一步将 Web Service 返回的 XML 输出到一个 XML 文件，然后在这里指定一下 XML 文件的路径地址，然后点击 Generate XSD 产生 xsd 文件。</p><p>在这个例子中我省略了对这些步骤的描述，这里选择的 Data access mode 是从一个变量中读取的，这个变量是前面出现的  VarCityInfo。</p><p>看看 Columns 中，返回的对 XML 输出解析出来的列。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201309/17213854-4b78550108c24bf6830eb2076a42d0ed.png"/></p><p>Source 指定好了，后面的就容易办了，拖放一个 OLE DB Destination 控件，指定相关的目标表并关联映射到 XML 源的输出列。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201309/17213905-d2340d4c684446c9a7e3be2b3aba6b8a.png"/></p><p>保存并执行 Package，检查数据库，输出正确。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201309/17213917-39eb824b80ec45b58ec2b6297f1178b6.png"/></p><p>Package 变量信息</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201309/17213928-929ee8ad22734b218bad2013cba76267.png"/></p><p>如果有一个 List 存放所有的 US ZipCode, 那么可以循环调用 Web Service 接口将所有的跟 Zip Code 相关的城市信息都可以一次性加载到数据表中。</p>
+</div>]
+</body>
+</html>

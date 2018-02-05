@@ -1,0 +1,34 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>今天在使用 QV 加载数据的时候会碰到列中的一些状态，信息是通过；或者 / 等符号分隔的，这样不利于做数据分析，因为字符串中的内容本身就是维度。上网搜了一下找到了解决的方法，记录一下。</p><p>比如第一幅图中 S200,M250,R35 都是 Invoice 的类型，这时都需要取出来作为分析的维度 DIMENSION。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201502/271525367215716.png"/></p><p>可以通过下面的代码来实现上图的分隔效果，取出所有的 Invoice 类型，这样就可以做数据统计分析了。当然，其它的列会出现重新数据，在聚合的时候注意就好了。</p><h2 id="articleHeader2">代码</h2><pre><code><span style="color: rgb(0, 0, 0);">Source:<br/>
+</span><span style="color: rgb(0, 0, 255);">Load</span> <span style="color: rgb(128, 128, 128);">*</span><span style="color: rgb(0, 0, 0);"> Inline <br/>
+</span><span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);"> ID , Invoice <br/>
+  1  , S200/M250/R35/<br/>
+  2  , M1687/A35/D879/F689/<br/>
+  3  , B33625/S55/<br/>
+</span><span style="color: rgb(255, 0, 0);">]</span><span style="color: rgb(0, 0, 0);"> ;<br/>
+<br/>
+Destination:<br/>
+</span><span style="color: rgb(0, 0, 255);">Load</span><span style="color: rgb(0, 0, 0);"> ID , <br/>
+     NewInvoice<br/>
+</span><span style="color: rgb(0, 0, 255);">Where</span> <span style="color: rgb(255, 0, 255);">Len</span> ( NewInvoice ) <span style="color: rgb(128, 128, 128);">&gt;</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">0</span><span style="color: rgb(0, 0, 0);">;<br/>
+</span><span style="color: rgb(0, 0, 255);">Load</span><span style="color: rgb(0, 0, 0);"><br/>
+    ID ,<br/>
+    Invoice ,<br/>
+    SubField( Invoice,</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">/</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">AS</span><span style="color: rgb(0, 0, 0);"> NewInvoice<br/>
+;<br/>
+</span><span style="color: rgb(0, 0, 255);">Load</span> <span style="color: rgb(128, 128, 128);">*</span><span style="color: rgb(0, 0, 0);"> Inline <br/>
+</span><span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);"> ID , Invoice <br/>
+  1  , S200/M250/R35/<br/>
+  2  , M1687/A35/D879/F689/<br/>
+  3  , B33625/S55/<br/>
+</span><span style="color: rgb(255, 0, 0);">]</span> ;</code></pre>
+</div>]
+</body>
+</html>

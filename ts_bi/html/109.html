@@ -1,0 +1,91 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<p> </p><h2 id="articleHeader1">TopCount  和 ButtomCount 函数<br/></h2><p>先看一个之前的例子，示例一 使用Order 排序</p><pre><code>SELECT<br>
+{ 　　([Measures].[Reseller Sales Amount]) } ON COLUMNS,<br/>
+Order(<br/>
+　　　　{[Product].[Subcategory].[Subcategory].Members},<br/>
+　　　　([Measures].[Reseller Sales Amount]),<br/>
+　　　　BDESC<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</br></code></pre><p>查询结果如下 – 对 Subcategory 下的成员按照 Reseller Sales Amount 降序排序，并且在排序的过程中打破了层次结构的分类，因为 DESC 和 ASC 的排序规则是基于层次结构的。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/24225817-5a46542a850a44f2aed3f4236058efdf.png"/>                  </p><p>像这样的排序查询可以很快的发现销售额最高或者最低的那些产品子类，但是有时候我们的查询往往可能只需要返回若干条或者有限的5条销售额最高或者最低的记录，这样的话就可以使用TopCount 或者 BottomCount 来实现了。</p><p>TopCount( {Set}, n [, Expression])</p><p>BottomCount( {Set}, n [, Expression])</p><p>示例二 使用 TopCount 查询有限的排序记录</p><pre><code>SELECT<br/>
+{ 　　([Measures].[Reseller Sales Amount]) } ON COLUMNS,<br/>
+TopCount(<br/>
+　　{[Product].[Subcategory].[Subcategory].Members},<br/>
+　　5,<br/>
+　　([Measures].[Reseller Sales Amount])<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/24225917-cc8cb0d35f0d4e9cb35f0443cb3ec18f.png"/></p><p>对比示例一，返回的是销售额最高的5条记录，并且可以看出排序后的数据也是打破了层次结构的限制。</p><p>示例三 倒序排序</p><pre><code>SELECT<br/>
+{ 　　([Measures].[Reseller Sales Amount]) } ON COLUMNS,<br/>
+ORDER(<br/>
+　　{[Product].[Subcategory].[Subcategory].Members},<br/>
+　　([Measures].[Reseller Sales Amount]),<br/>
+　　BASC<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/24230023-9aed1f95c77f4420aee5616a9f501062.png"/></p><p>示例四 使用 BottomCount 取最后的5条记录</p><pre><code>SELECT<br/>
+{ 　　([Measures].[Reseller Sales Amount]) } ON COLUMNS,<br/>
+BottomCount(<br/>
+　　{[Product].[Subcategory].[Subcategory].Members},<br/>
+　　5,<br/>
+　　([Measures].[Reseller Sales Amount])<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/24230121-08278f8179264d37ac6dc330c8fc64d4.png"/></p><p>查询结果 – 显示有 NULL 的原因是因为这几类子产品的确没有销售记录，如果不想返回 NULL 记录的话可以通过 Filter 和 NONEmpty 函数来解决这些问题。</p><h2 id="articleHeader2">Head 和 Tail 函数 （头部和尾部函数）</h2><p>Head({Set} [,n])</p><p>Tail({Set} [,n])</p><p>Head 和 Tail 函数从一个集合的头部或者尾部返回指定数量的元祖，它们与 TopCount 和 BottomCount 的区别就是 Head 和 Tail 函数不会对集合里的元组进行排序，只是返回指定数量的元组并以集合形式返回。如果没指定返回的数量，那么就返回集合的第一个或者最后一个元组，需要的时候可以结合Order 来使用。</p><p>一般的查询</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{[Product].[Subcategory].[Subcategory].Members} ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p>按默认顺序返回</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/24230222-5ff6aea527f140c18819b0f82b751580.png"/></p><p>没有指定数目的时候</p><pre><code>SELECT<br/>
+{ 　　([Measures].[Reseller Sales Amount]) } ON COLUMNS,<br/>
+HEAD( 　　{[Product].[Subcategory].[Subcategory].Members} ) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p>使用Head默认就返回第一条数据</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/24230248-ad10807f69c546f6ba78357064f39076.png"/></p><p>指定数量，比如10条数据 (有的时候当查询数据很大，但是可能仅仅只需要一部分测试数据时使用Head 很方便)。</p><pre><code>SELECT<br/>
+{ 　　([Measures].[Reseller Sales Amount]) } ON COLUMNS,<br/>
+HEAD( 　　　　{[Product].[Subcategory].[Subcategory].Members} 　　　　,10 　　) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p>按照默认顺序返回10条数据</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/24230356-8100b5a1f6924d24a5b40680c67fdda9.png"/></p><p>也可以结合Order 返回排序后的几条数据，实际上等同于 TopCount或者BottomCount 的效果。</p><pre><code>SELECT<br/>
+{ 　　([Measures].[Reseller Sales Amount]) } ON COLUMNS,<br/>
+HEAD(<br/>
+　　Order(<br/>
+　　　　　　{[Product].[Subcategory].[Subcategory].Members},<br/>
+　　　　　　([Measures].[Reseller Sales Amount]),<br/>
+　　　　　　BDESC<br/>
+　　　　),<br/>
+　　5<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/24230520-0b77b64b06aa48dbaacca800083f3aee.png"/></p><h2 id="articleHeader3">The Item Function 使用Item 函数</h2><p>上面的 TopCount，BottomCount，Head，Tail 函数返回的都是集合，但有的时候我们可能仅仅需要查询到集合中的一个元组，而无论这个集合有没有排序，这时可以使用 Item 函数。</p><p>{Set} | (Tuple).Item( i )</p><p>{Set}.Item( String1 [, String2, . . ., Stringn] )</p><p>在第一种形式中，可以通过提供编号返回集合中的一个元组。在集合中的每一个元组都可以通过一个有序的值来访问，在集合中的第一个元组它的编号是0。</p><p>在第二种语法中，可以通过字符串参数的形式返回元组，但是这种方式有点复杂用的也不是非常多。</p><p>另外要注意的是，Item 函数不仅仅用于返回集合中的元组，当定位到一个元组的时候，使用这个函数还可以访问到具体的Member 成员。如果要访问元组中的成员，那么只能使用从0开始基于数字的编号来访问元组中的成员。</p><p>下面的例子中展示了如果使用 Item 函数查询这4年中的每一年 Internet 销售额最高的产品。</p><pre><code>WITH<br/>
+MEMBER [Measures].[Top Product Sales] AS {<br/>
+　　EXISTING<br/>
+　　TopCount(<br/>
+　　　　[Product].[Product].[Product].Members, 　　　　1, 　　　　([Measures].[Internet Sales Amount])<br/>
+　　) *<br/>
+　　{[Measures].[Internet Sales Amount]}<br/>
+}.Item(0)<br/>
+,FORMAT_STRING="Currency"<br/>
+<br/>
+MEMBER [Measures].[Top Product Name] AS<br/>
+{<br/>
+　　EXISTING<br/>
+　　TopCount(<br/>
+　　　　[Product].[Product].[Product].Members,<br/>
+　　　　1,<br/>
+　　　　([Measures].[Internet Sales Amount])<br/>
+　　)<br/>
+}.Item(0).Item(0).Name<br/>
+<br/>
+SELECT<br/>
+{<br/>
+　　([Measures].[Internet Sales Amount]),<br/>
+　　([Measures].[Top Product Sales]),<br/>
+　　([Measures].[Top Product Name])<br/>
+} ON COLUMNS,<br/>
+{<br/>
+　　([Date].[Calendar Year].[CY 2001]),<br/>
+　　([Date].[Calendar Year].[CY 2002]),<br/>
+　　([Date].[Calendar Year].[CY 2003]),<br/>
+　　([Date].[Calendar Year].[CY 2004])<br/>
+} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p>查询结果 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/24230838-1a79590fb4c647eb85461c1c791f9596.png"/></p>
+</div>]
+</body>
+</html>

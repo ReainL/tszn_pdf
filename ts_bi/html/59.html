@@ -1,0 +1,17 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇语</h2><p>这是我以前做过一个汽车金融项目中的数据处理案例，从原业务系统中抽取业务数据然后按照规则计算出每一个ID对应的时间周期。原数据结构和我这里描述的大同小异，业务规则也比较接近，我整理一个数据原型，大家有时间可以做的试一下。可以用 SQL 的方式，也可以用 ETL 工具，要做的事情就是将很不规则的原数据按照要求清洗成规范的数据，最后得到每一个 ID 的 DURATION 值，我们的报表要呈现的就是这些值。</p><h2 id="articleHeader2">测试数据</h2><p>最左侧是测试数据，中间的是我当时清洗数据的时候创建的中间表，用来后续记录并检查数据逻辑的，最左侧是最终每一个 ID 的有效时间天数。</p><p><img alt="1.jpg" height="308" src="http://7xlhg3.com1.z0.glb.clouddn.com/uploads/article/20160225/1fc65a41b1de95b56e028ffc5c0c4575.jpg" width="1602"/><br/></p><p>对应的规则解释与清洗过程逻辑描述，规则见最下方。</p><p><img alt="2.jpg" height="663" src="http://7xlhg3.com1.z0.glb.clouddn.com/uploads/article/20160225/7004f52c57593c4371c656ebed1671e6.jpg" width="1219"/><br/></p><p><img alt="3.jpg" height="374" src="http://7xlhg3.com1.z0.glb.clouddn.com/uploads/article/20160225/1df73552e24ea824c60212cfdd46c449.jpg" width="1219"/><br/></p><p><img alt="1.jpg" height="510" src="http://7xlhg3.com1.z0.glb.clouddn.com/uploads/article/20160302/95316c3e82076ee098147755891dd750.jpg" width="1219"/><br/></p><h2 id="articleHeader3">清洗规则</h2><p><img alt="8.jpg" height="500" src="http://7xlhg3.com1.z0.glb.clouddn.com/uploads/article/20160225/df3b25473862699db0c5c633c4f515ce.jpg" width="1241"/><br/></p><p>如果要说 ETL 处理的是什么样的数据，处理场景是怎么样的，这个案例就可以算一个。</p><h3 id="articleHeader4">补充</h3><p>上述的只是测试数据涉及到 7 个 ID，实际上我们处理的数据量有几千万，覆盖 20 多个场景，所以也可以自行补充一些数据测试来验证程序的正确性。</p><p>PS：感谢@<a href="http://www.flybi.net/people/%E8%A6%81%E9%80%89%E5%B0%B1%E9%80%89S%E5%9E%8B">要选就选S型</a>的提醒，数据源的中数据 ID=1005中 其中原 0034 更正为 0022。</p>
+<ul class="aw-upload-file-list">
+<li>
+<a href="https://ask.hellobi.com/file/download/file_name-RVRMX+aVsOaNrua4hea0l+aMkeaImC54bHN4__url-aHR0cHM6Ly9hc2suaGVsbG9iaS5jb20vdXBsb2Fkcy9hcnRpY2xlLzIwMTYwMzAyLzQwMGNlOGZmNzkxNzY0MDlmZGMwZjVkODJjZmNmNGQ1"><i class="icon icon-attach"></i> ETL_数据清洗挑战.xlsx</a>
+</li>
+</ul>
+</div>]
+</body>
+</html>

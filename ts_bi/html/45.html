@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>碰到有几个朋友问到这个问题，比较共性，就特意写了这篇小文章说明一下如何实现在 SSIS 中导出数据到 Office Excel 2013 中。通常情况下 2013 以前的版本大多没有问题，但是到 2013 就可能在建立连接管理器的时候出现链接失败。</p><p>建议在看这一篇文章之前，如果有导出数据到 Excel 2013 的需求，请先参看我的另外一篇文章 - <a href="http://www.flybi.net/blog/biwork/599"><u><font color="#0066cc">SSIS 系列 - 通过 OLE DB 连接访问 Excel 2013 以及对不同 Sheet 页的数据处理</font></u></a> 。先按照这篇文章实际做一遍，安装所需要的驱动，等成功实现了，那么这里的数据导出就非常的简单。</p><h2 id="articleHeader2">案例讲解</h2><p>假设你已经按照上面这篇文章安装好了驱动，并能成功加载数据到数据库中，那么下面将介绍如何在 SSIS 中将数据导出到 Office Excel 2013 中。只有这个驱动安装好了，下面在连接到 Excel 2013 文件的时候才不会出现报错信息。</p><p>我的测试数据源，大概有1W8K 多行数据。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/182307058076130.png"/></p><p>先建好这个 Excel 文件，并且最好指定好 Sheet 页的名称 Customer；在第一行的位置指定好列标题，即需要被导出的列名称。其实这个很好理解，之所以这么提前创建好，是因为它具备一定的格式，像一个小数据库表一样有行和列的概念。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/182307301352198.png"/></p><p>数据源的连接就不再提了，选择好 Excel Destination。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/182310130414162.png"/></p><p>在 Excel Connection Manager 处选择新建一个链接管理器，选择好目标 Excel 并勾选中第一行是列标题。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/182310440881810.png"/></p><p>这时就能看到刚才创建好的 Sheet 列名称了。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/182311474008933.png"/></p><p>然后是列的 Mapping 关系，这样就类似于数据源对数据源，表对表，列对列就全部建立好对应关系了。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/182313170416482.png"/></p><p>保存并执行包，有 18484 条数据导出了。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/182314241827904.png"/></p><p>包执行的同时，Excel 的数据就已经在自动增长了，检查一下条数也是正确的。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/182314298074685.png"/></p><p>所以如果是连接的问题，可以认真参照这一篇文章 - <a href="http://www.flybi.net/blog/biwork/599"><u><font color="#0066cc">SSIS 系列 - 通过 OLE DB 连接访问 Excel 2013 以及对不同 Sheet 页的数据处理</font></u></a> 安装好驱动，以及要注意安装的是32位版本。</p><p>另外一个问题，可能有人在问可不可以在导出的时候创建这个文件，Excel 不需要实现存在，这个能不能实现？ 包括自动创建 Sheet 名称以及列名称。</p><p>我没有实际操作过，因为从安装驱动的时候就可以看出它实际上给出的驱动是关于 Access 的驱动，也就是说这里的 Excel 相当于一个小型的数据库，Sheet 就是表。我们的数据导入导出都需要从数据源到数据源的对应，表对表的对应，列到列的对应，因此这些文件以及表名应该事先定义好。</p><p>可不可以动态创建 Excel，然后再导出数据 - 可以。</p><p>可以先通过 Script Task C#脚本创建好 Excel 文件，包括 Sheet 名和列名，然后再导出数据到 Excel 文件中去的。Excel 文件名称是按时间+表名命名的，每天都导出一个，所以在程序中创建，就不用手工创建了。</p>
+</div>]
+</body>
+</html>

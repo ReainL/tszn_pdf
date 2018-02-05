@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>在通过 sp_configure 进行 Database Mail 配置时出现了以下的这个错误信息</p><p>Msg 15123, Level 16, State 1, Procedure sp_configure, Line 62</p><p>The configuration option 'Database Mail XPs' does not exist, or it may be an advanced option.</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201301/07142954-945b5a3d904f47b8b1b2810a8b2551c3.png"/></p><h2 id="articleHeader2">解决方法</h2><p>EXEC sp_configure 'show advanced options', 1</p><p>GO</p><p>RECONFIGURE WITH OVERRIDE</p><p>GO</p><p>EXEC sp_configure 'Database Mail XPs', 1</p><p>GO</p><p>RECONFIGURE WITH OVERRIDE</p><p>GO<br/></p>
+</div>]
+</body>
+</html>

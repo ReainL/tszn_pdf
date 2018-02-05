@@ -1,0 +1,78 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>基于雪花模型的维度以下面的 Product 产品与产品子类别，产品类别为例。DimProduct 表和 DimProductSubcategory 表有外键关系，而 DimProductSubcategory 表和 DimProductCategory 表存在外键关系。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112248-0583bf630f3b46e8b2ec7693245b44fb.png"/></p><pre><code><span style="font-family: Microsoft Yahei; font-size: 14px;">测试的维度表与数据 <span style="color: rgb(128, 128, 128);">-</span> <br/>
+<span style="color: rgb(0, 0, 255);">USE</span><span> BIWORK_SSIS<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimProduct</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> DimProduct <br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimProductSubcategory</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> DimProductSubcategory <br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimProductCategory</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> DimProductCategory <br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span><span> ProductKey,<br/>
+       ProductAlternateKey,<br/>
+       ProductSubcategoryKey,<br/>
+       EnglishProductName,<br/>
+       StandardCost,<br/>
+       Color,<br/>
+       SafetyStockLevel,<br/>
+       ListPrice,<br/>
+       Class,<br/>
+       Size,<br/>
+       StartDate,<br/>
+       EndDate,<br/>
+       </span><span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);">Status</span><span style="color: rgb(255, 0, 0);">]</span><span>,<br/>
+       ProductAlternateKey </span><span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);"> (</span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 255);">CONVERT</span> (<span style="color: rgb(0, 0, 255);">Char</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">10</span>), StartDate, <span style="color: rgb(128, 0, 0); font-weight: bold;">120</span>) <span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">)</span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(0, 0, 255);">AS</span><span> ProductID<br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span> DimProduct<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span> AdventureWorksDW2012.dbo.DimProduct<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span><span> ProductSubcategoryKey,<br/>
+       ProductSubcategoryAlternateKey,<br/>
+       EnglishProductSubcategoryName,<br/>
+       ProductCategoryKey <br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span> DimProductSubcategory<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span> AdventureWorksDW2012.dbo.DimProductSubcategory<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span><span> ProductCategoryKey,<br/>
+       ProductCategoryAlternateKey,<br/>
+       EnglishProductCategoryName<br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span> DimProductCategory<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span> AdventureWorksDW2012.dbo.DimProductCategory<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> DimProductCategory <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_CategoryKey <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span>(ProductCategoryKey)<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> DimProductSubcategory <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_SubCategoryKey <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span>(ProductSubcategoryKey)<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> DimProduct <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_Product <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span>(ProductKey)<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> DimProduct<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_SubcategoryKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(ProductSubcategoryKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span> DimProductSubcategory(ProductSubcategoryKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> DimProductSubcategory<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_CategoryKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(ProductCategoryKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span> DimProductCategory(ProductCategoryKey)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span> DimProduct <br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span> DimProductSubcategory<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span> DimProductCategory</span></code></pre><h2 id="articleHeader2">案例说明</h2><p>新建一个 SSAS 项目并创建数据源和数据源视图 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112315-f353c28ba22f4e248a060ac2f14c3f98.png"/></p><p>新建一个 Dimension 指定使用 DimProduct 表，Key Column 为 ProductKey 列，Name Column 为 Product ID 列。每个属性都有两种特性：Key Column 来引用唯一确定属性成员的一列 (如果是复合主键的话可能是多列)，Name Column 来引用包含描述性标签的列，它是显示在报表上被浏览的文本。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112327-1771492941f5423ea1098e410c5ad796.png"/></p><p>由于 DimProduct 表是雪花型产品维度的一部分，因此相关联的表业也会被包括进来，向导默认为每个表的主键创建属性。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112344-dc7e544750864e138f900a6a2462786b.png"/></p><p>选择需要出现在维度中的维度属性，用户根据这些属性来查看相应的事实数据。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112357-b7f4491965164314a8c82890bcbc172b.png"/></p><p>重命名属性，让这些属性名称看起来更符合人们的习惯。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112412-d489c201302f4cd8959e1860f78e7e61.png"/></p><p>下一步并指定维度名称为 Product ，就可以看到维度设计中维度以及它下面的属性，可以部署一下这个项目。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112427-0700e28c40064a1da4d5429ae9836523.png"/></p><p>部署之后可以在 Browser 浏览器中查看属性层次结构，在维度中的每一个属性都是一个属性层次结构，它通常包含两个级别：一个是 ALL 级别，第二个是由 Category 属性值构成的级别。 但是在这里看到的 Category ALL 级别下的成员都是数值，并不能明确表示它自身的含义。这是因为我们之前在创建这个属性的时候，只默认指定了 Category 的 Key Column 而没有指定 Category 的 Name Column，因此需要修改这些属性的 Name Column。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112439-9e24bed92895401fb62108539fbb55fa.png"/></p><p>修改属性 Category 的 Name Column ，同样的还需要修改 Subcategory 。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112453-94ee5ba51e20469a8f53263b25a25e33.png"/></p><p>修改完成之后重新部署一下，就可以看到对应的属性标签内容了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112505-1386189bd8224942a83f1d9a443e9b87.png"/></p><p>接下来我们需要创建一些层次结构来方便用户从指定的角度来查看事实数据。维度中的层次结构一般分为：属性层次结构，用户自定义层次结构中的非自然层次结构和自定义层次结构中通过创建属性关系所识别的自然层次结构。</p><p>属性层次结构我们前面我们已经看到过了，即每一个属性都是一个属性层次结构。属性层次结构一般含有两层，第一层是 ALL 级别，第二层是自身数据形成的成员级别。</p><p>自定义层次结构的自然层次结构中，每一个子成员都只有一个父成员，并且级别可能多于两级。 我们可以通过创建属性关系来建立自然层次结构，创建属性关系可以加快数据库的处理速度。 由于提供了更快的数据访问并改善了查询执行计划，从而也提升了查询性能。</p><p>自定义的层次结构也包含自然层次结构，但是也可以不是自然层次结构，也就是说子类可能存在多个父类。</p><p>对于产品，产品子类，产品大类这几个属性来说，是符合自然层次结构的要求的。一个产品只属于一个产品子类，一个产品子类也只属于一个产品大类。</p><p>对于颜色和大小，一个颜色可以对应多个不同大小的尺码，不同大小的尺码也可以对应多个颜色。那么为颜色和大小创建自定义的层次结构，就是属于自定义层次结构中的非自然层次结构了。</p><p>创建 Category - Subcategory - Product 这样的层次结构，并创建 Color - Size 这样的层次结构。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112519-d6546c505aa844a8a569a5f482e1bffd.png"/></p><p>在属性关系中查看各个属性是如何关联的，下图所示可以看到基本上所有的属性都是通过关键属性 Product ID 相关联的， Category 和 Product ID 是通过 Subcategory 间接关联的。 那么在分析服务中，这种关联关系表示了分析服务可以通过聚合所有与某个 Category 相关的 Subcategory 的值来得到该 Category 的值。但是分析服务不能从 Product 中得到 Subcategory 的值，因为 Product 和 Subcategory 没有关系。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112536-a02d1dd27c6c4264964ae9f954dae619.png"/></p><p>我们通过修改 Product 和 Subcategory 的属性关系实现了一种自定义的自然层次结构。但是像 Color 和 Size 这种本身在层次逻辑上就并不存在这种自然层次结构的特征，因此就不需要做出任何改变了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112647-0b5417ca7426412293f33abc5b2d7a2f.png"/></p><p>部署并查看层次结构 - Product By Category  -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112657-9c52e430a2314a7f958e268433b67dfc.png"/></p><p>Color by Size -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23112709-0802ed92919c44e4a91bf8a72f96eb76.png"/></p>
+</div>]
+</body>
+</html>

@@ -1,0 +1,124 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<p><strong>Current Member  当前成员</strong></p><p>在计算成员中会经常用到获取当前对象的函数, 可以这样来访问 [Dimension].[Hierarchy].CurrentMember</p><p>但是要注意这个函数返回的仅仅是一个成员的引用，一般要通过访问成员的某些属性来获取一些具体的值。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19153230-b02a542078a147a396603f7447b6b936.png"/>    </p><p><strong>示例一　- 访问当前成员和父成员</strong></p><pre><code><span style="color: #0000ff;">WITH</span><br/>
+MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Current Member Name</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+    <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember.Name<br/>
+<br/>
+MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Parent Member Name</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+    <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember.Parent.Name<br/>
+<br/>
+MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Current Member Name NULL</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+    <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember<br/>
+<br/>
+MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Parent Member Name NULL</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+    <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember.Parent<br/>
+<br/>
+<span style="color: #0000ff;">SELECT</span><br/>
+{<br/>
+            (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Current Member Name</span><span style="color: #ff0000;">]</span>),<br/>
+            (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Parent Member Name</span><span style="color: #ff0000;">]</span>),<br/>
+            (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Current Member Name NULL</span><span style="color: #ff0000;">]</span>),<br/>
+            (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Parent Member Name NULL</span><span style="color: #ff0000;">]</span>)<br/>
+} <span style="color: #0000ff;">ON</span> COLUMNS,<br/>
+{<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.AllMembers} <span style="color: #0000ff;">ON</span> ROWS<br/>
+<span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Step-by-Step</span><span style="color: #ff0000;">]</span></code></pre><p>查询结果</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19153342-7e1cf9648e2b45bdafdd48c9b890b5ac.png"/></p><p>最后两列的值都是为 NULL, 是因为无论是 CurrentMember 还是 CurrentMember.Parent 返回的只是一个引用，要得到具体的值就应该在引用的时候加上一些属性。</p><p>CurrentMember 返回的是当前的成员</p><p>CurrentMember.Parent 返回的是当前成员的父成员引用</p><p>在这个例子中可以看到这些成员的父成员，除了 All Products 外，因为对于 All Products 来说它没有父成员，所以显示为 null。</p><p><strong>MEMBER.Properties 函数的使用</strong></p><p>Properties 可以帮助通过名称返回一个成员固有的或者用户自定义的属性内容。一般情况下是以字符串形式返回，除了指定了　TYPED 关键字，那么将按照这个属性本身的数据类型来返回数据。</p><p>member.Properties( Name [, TYPED] )</p><p>下面列表中列出了 SSAS 自带的成员属性　</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19153451-75f0348cfcb144d884a4c48a1108cfa8.png"/></p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19153500-079ed2d863b64c02a5b155de771840c9.png"/></p><p><strong>示例二　使用　Properties</strong></p><pre><code><span style="color: #0000ff;">WITH</span><br/>
+MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Parent Member Name</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember.Properties("LEVEL_NUMBER") <br/>
+<br/>
+<span style="color: #0000ff;">SELECT</span><br/>
+{(<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Parent Member Name</span><span style="color: #ff0000;">]</span>)} <span style="color: #0000ff;">ON</span> COLUMNS,<br/>
+{<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.AllMembers} <span style="color: #0000ff;">ON</span> ROWS<br/>
+<span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Step-by-Step</span><span style="color: #ff0000;">]</span>;</code></pre><p>按照之前的图例解释 LEVEL_NUMBER　返回的是这个成员在属性层次结构中的位置，根成员的Level 为0。</p><p>查询结果 –</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19153653-aba506d326f048228303c72cef63c631.png"/></p><p><strong>示例三  使用 IIF 条件语句</strong></p><p>使用IIF 表达式很简单，和我们在其它变成语言中学习的 if 条件语句使用相同</p><p>下面示例查询所有的　Product 成员并显示它们的父成员，由于根Level的成员没有父成员，因此根成员的父成员将被显示为 “Not Applicable”</p><pre><code><span style="color: #0000ff;">WITH</span><br/>
+MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Parent Member Name</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+IIF(<br/>
+    <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember.Properties("Level_Number",TYPED)<span style="color: #808080;">=</span><span style="color: #800000; font-weight: bold;">0</span>,<br/>
+    "<span style="color: #808080;">Not</span> Applicable",<br/>
+    <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember.Parent.Name<br/>
+)<br/>
+<br/>
+<span style="color: #0000ff;">SELECT</span><br/>
+{(<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Parent Member Name</span><span style="color: #ff0000;">]</span>)} <span style="color: #0000ff;">ON</span> COLUMNS,<br/>
+{<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.AllMembers} <span style="color: #0000ff;">ON</span> ROWS<br/>
+<span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Step-by-Step</span><span style="color: #ff0000;">]</span>;</code></pre><p>查询结果</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19153832-8f306cd28b294d21afad23d1e4f65372.png"/></p><p><strong>示例四　继续使用 IIF 条件　</strong></p><pre><code><span style="color: #0000ff;">WITH</span><br/>
+MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Parent Member Name</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+IIF(<br/>
+    <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember.Properties("Level_Number",TYPED)<span style="color: #808080;">=</span><span style="color: #800000; font-weight: bold;">0</span>,<br/>
+　　 "N<span style="color: #808080;">ot</span> Applicable",<br/>
+<span style="color: #ff0000;">　　 [</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember.Parent.Name<br/>
+)<br/>
+<br/>
+MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Percent of Parent</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+　　(<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Reseller Sales Amount</span><span style="color: #ff0000;">]</span>)<span style="color: #808080;">/</span><br/>
+　　(<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember.Parent, <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Reseller Sales Amount</span><span style="color: #ff0000;">]</span>)<br/>
+　　,FORMAT_STRING<span style="color: #808080;">=</span>"<span style="color: #0000ff;">Percent</span>"<br/>
+<br/>
+<span style="color: #0000ff;">SELECT</span><br/>
+{<br/>
+    (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Parent Member Name</span><span style="color: #ff0000;">]</span>),<br/>
+    (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Reseller Sales Amount</span><span style="color: #ff0000;">]</span>),<br/>
+    (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Percent of Parent</span><span style="color: #ff0000;">]</span>)<br/>
+} <span style="color: #0000ff;">ON</span> COLUMNS,<br/>
+{<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.AllMembers} <span style="color: #0000ff;">ON</span> ROWS<br/>
+<span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Step-by-Step</span><span style="color: #ff0000;">]</span>;</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19154100-c46df516b83740bc970eb0120144f503.png"/></p><p>第一点要注意的是如何引用一个父类成员　[Product].[Product Categories].CurrentMember.Parent</p><p>而不是之前的例子中[Product].[Product Categories].CurrentMember.Parent.Name, 请一定分清父成员和父成员属性的区别。</p><p>第二点当父成员为 NULL 的时候,整个元组 ([Product].[Product Categories].CurrentMember.Parent, [Measures].[Reseller Sales Amount])也为NULL，但是在除法运算中将被替换为0 ，分母为0，运算出错。但是注意，这里的 NULL 分为两种情况，一种是真正的NULL，不存在这个值转换为0；一种是因为没有值显示为NULL，那么最后计算的结果也显示为 NULL。</p><p>加上对父成员级别的判断</p><pre><code><span style="color: #0000ff;">WITH</span><br/>
+MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Parent Member Name</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+IIF(<br/>
+    <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember.Properties("Level_Number",TYPED)<span style="color: #808080;">=</span><span style="color: #800000; font-weight: bold;">0</span>,<br/>
+    "<span style="color: #808080;">Not</span> Applicable",<br/>
+    <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember.Parent.Name<br/>
+)<br/>
+<br/>
+MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Percent of Parent</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+IIF(<br/>
+    <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember.Properties("Level_Number",TYPED)<span style="color: #808080;">=</span><span style="color: #800000; font-weight: bold;">0</span>,<br/>
+    "<span style="color: #808080;">Not</span> Applicable",<br/>
+    (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Reseller Sales Amount</span><span style="color: #ff0000;">]</span>)<span style="color: #808080;">/</span><br/>
+    (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.CurrentMember.Parent,<br/>
+    <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Reseller Sales Amount</span><span style="color: #ff0000;">]</span>)<br/>
+)<br/>
+,FORMAT_STRING<span style="color: #808080;">=</span>"<span style="color: #0000ff;">Percent</span>"<br/>
+<br/>
+<span style="color: #0000ff;">SELECT</span><br/>
+{<br/>
+    (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Parent Member Name</span><span style="color: #ff0000;">]</span>),<br/>
+    (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Reseller Sales Amount</span><span style="color: #ff0000;">]</span>),<br/>
+    (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Percent of Parent</span><span style="color: #ff0000;">]</span>)<br/>
+} <span style="color: #0000ff;">ON</span> COLUMNS,<br/>
+{<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product Categories</span><span style="color: #ff0000;">]</span>.AllMembers} <span style="color: #0000ff;">ON</span> ROWS<br/>
+<span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Step-by-Step</span><span style="color: #ff0000;">]</span></code></pre><p>查询结果</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19154258-03a6456397de4e1292827718794e34ef.png"/></p><p>除了　CurrentMember　以外，Analysis Services　还支持其它的一些行数来访问一些比较特别的成员。</p><pre><code><span style="color: #ff0000;">[</span><span style="color: #ff0000;">Dimension</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Hierarchy</span><span style="color: #ff0000;">]</span>.DefaultMember<br/>
+<br/>
+<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Dimension</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Hierarchy</span><span style="color: #ff0000;">]</span>.UnknownMember<br/>
+<br/>
+<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Dimension</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Hierarchy</span><span style="color: #ff0000;">]</span>.DataMember</code></pre><p>DefaultMember 函数返回一个给定层次结构的默认成员。如果没有定义默认成员，那么就返回All这个成员，如果没有All这个成员，就返回层次结构中第一个成员。</p><p>UnknownMember 函数返回指定的层次结构中未知的成员。如果不存在这种 unknown 成员，那么就返回 null。但是在度量值层次结构中使用 UnknownMember，就返回一个 error，因为在度量值层次结构中不应该存在 unknown　成员这种概念。　</p><p>DataMember　返回系统生成的数据成员，它与某个维度的非叶成员相关联。</p><p><strong>在表达式中使用 SET 集合</strong></p><p><span style="color: rgb(255, 0, 0);">在表达式中使用 SET 集合要注意，SET 集合不会被当前单元格的上下文所影响。这样一来，Auto-Exists 机制就无法应用</span>，先来看一个例子。</p><pre><code><span style="color: #0000ff;">WITH</span><br/>
+MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Number of Products</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+<span style="color: #ff00ff;">COUNT</span>(<br/>
+            <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.Members<br/>
+)<br/>
+<br/>
+<span style="color: #0000ff;">SELECT</span><br/>
+{<br/>
+            (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Reseller Sales Amount</span><span style="color: #ff0000;">]</span>),<br/>
+            (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Number of Products</span><span style="color: #ff0000;">]</span>)<br/>
+} <span style="color: #0000ff;">ON</span> COLUMNS,<br/>
+{<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Category</span><span style="color: #ff0000;">]</span>.Members} <span style="color: #0000ff;">ON</span> ROWS<br/>
+<span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Step-by-Step</span><span style="color: #ff0000;">]</span></code></pre><p>查询结果</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19154434-e4b71d14548747beb5146b28bac983fe.png"/> </p><p>按照我们之前的理解, 在计算 Category　下面有多少个Products时，Auto-Exists 会自动归类匹配，但是实际上 Products 集合在计算成员总数的时候并没有关联到计算成员中的Tuple的上下文环境，因此算出来的总数就是实际所有 Product的总数 397。</p><p><span style="color: rgb(255, 0, 0);">使用 Existing 关键字可以强制在计算成员表达式中的 SET 使用当前上下文环境。</span></p><pre><code><span style="color: #0000ff;">WITH</span><br/>
+MEMBER <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Number of Products</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+<span style="color: #ff00ff;">COUNT</span>(<br/>
+EXISTING <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.Members<br/>
+)<br/>
+<br/>
+<span style="color: #0000ff;">SELECT</span><br/>
+{<br/>
+    (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Reseller Sales Amount</span><span style="color: #ff0000;">]</span>),<br/>
+    (<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Number of Products</span><span style="color: #ff0000;">]</span>)<br/>
+} <span style="color: #0000ff;">ON</span> COLUMNS,<br/>
+{<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Product</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Category</span><span style="color: #ff0000;">]</span>.Members} <span style="color: #0000ff;">ON</span> ROWS<br/>
+<span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Step-by-Step</span><span style="color: #ff0000;">]</span>;</code></pre><p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif"/><img alt="" src="http://images.cnitblog.com/blog/477275/201304/19154520-55273d047dae43d49ea039e1de341307.png"/></p><p>可以这样理解，在依次与 Product.Category 层次结构下的各个成员交汇的时候，那么这些成员就限定了计算成员中 Products 统计成员个数的空间。</p><p>比如说，当前读取的 Category 成员是Bikes，那么在应用了 Existing 关键字后，可以认为所有的关于 Products 下的 Members 的统计实际上都限定在了 Bikes 这个大类下面来进行了，Bikes 就是它们的上下文环境，其实这就是 Auto-Exists 的作用。</p>
+</div>]
+</body>
+</html>

@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h3 id="articleHeader1" style="margin-left: 0px;">开篇介绍</h3><p>在 ETL 项目中，SSIS 控制流控件 Conditional Split (条件拆分) 的使用实际上还是比较频繁的。特别出现一个源需要将数据按条件输出到不同的目标表，文件这种情况，条件拆分 Conditional Split 控件就可以派上用场了。</p><h3 id="articleHeader2" style="margin-left: 0px;">Conditional Split 的使用</h3><p>比如说，我们要把订单中在订单时间 OrderDate 和 ShipDate 之间 5 天以内的数据输出一份，6 - 9 天之间的数据输出一份，10 和 10 天以上的输出一份。这里很显然有一个输入，三个输出。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201410/291555308316986.png"/></p><p>按照上述条件完成条件表达式的设计，注意到如果我们的天数是字符串类型的 “5”的话，那么需要通过 (DT_I4) 进行类型转换的，如果是时间字符串则需要 (DB_DBDATE) 转换成时间类型的。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201410/291555409097007.png"/></p><p>这里是其中一个目标表的配置。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201410/291555502221130.png"/></p><p>执行整个包可以看到不同的记录根据时间差输出到不同的目标对象中。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201410/291555580194281.png"/></p><p>有一种做法就是分别写三套 SQL 语句，完成 3 个数据集的查询，然后分别在 SSIS 中建立三个数据流任务来完成这些数据的抽取。像这种情况，我们需要有两个地方注意：第一，这里需要建立三个与数据源的连接，需要访问三次，这种效率在不同级别的数据量上和实际服务器配置环境上相对于使用条件分拆控件的效率会有差异，这个可以通过测试来选择哪种方式效率更高。第二，如果数据源是非数据表，而是文本文件，那么就不能写 SQL 语句，而只能通过这种方式在数据抽取的过程中进行条件判断和输出。</p><h3 id="articleHeader3" style="margin-left: 0px;">总结</h3><p>Conditional Split 控件的使用确实比较简单，但是也仍然需要非常灵活的使用它。在这个案例中我们使用的是通过比较表中的两个列的值确定输出条件，但有的时候也可能使用包变量的值作为比较条件，这些操作需要大家在实际使用中不断灵活的应变以解决实际需求。</p>
+</div>]
+</body>
+</html>

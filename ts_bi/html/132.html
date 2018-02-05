@@ -1,0 +1,52 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1"><span style="color: rgb(0, 0, 0);">开篇介绍</span></h2><p><span style="color: rgb(0, 0, 0);">常用的情形是在部署测试数据库时需要通过SQL代码自动重新创建数据库，在删除的时候往往会发生错误,错误信息一般会指出目前有用户连接到这个数据库上，因此不能删除。</span></p><h2 id="articleHeader2"><span style="color: rgb(0, 0, 0);">实现的方式</span></h2><p><span style="color: rgb(0, 0, 0);">通过查询指定数据库中活跃的 SPID，然后一一删除。</span></p><pre><code><span style='font-family: "Microsoft Yahei"; font-size: 13px;'><span style="color: rgb(0, 0, 255);">SET</span> ANSI_NULLS <span style="color: rgb(0, 0, 255);">ON</span><br/>
+<span style="color: rgb(0, 0, 255);">GO</span><br/>
+<span style="color: rgb(0, 0, 255);">SET</span> QUOTED_IDENTIFIER <span style="color: rgb(0, 0, 255);">ON</span><br/>
+<span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">USE</span> MASTER<br/>
+<span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">dbo.USP_KillSPID</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">P</span><span style="color: rgb(255, 0, 0);">'</span>)<span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">PROCEDURE</span> dbo.USP_KillSPID<br/>
+<span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">PROCEDURE</span> dbo.USP_KillSPID<br/>
+<span style="color: rgb(0, 128, 0);">@DatabaseName</span> <span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>)<br/>
+<span style="color: rgb(0, 0, 255);">AS</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">DECLARE</span> <span style="color: rgb(0, 128, 0);">@SPID</span> <span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>)<br/>
+<span style="color: rgb(0, 0, 255);">DECLARE</span> curDBLogin <span style="color: rgb(0, 0, 255);">CURSOR</span> <span style="color: rgb(0, 0, 255);">FOR</span><br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(255, 0, 255);">CAST</span>(SPID <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>)) <span style="color: rgb(0, 0, 255);">AS</span> SPID<br/>
+<span style="color: rgb(0, 0, 255);">FROM</span> MASTER..sysprocesses<br/>
+<span style="color: rgb(0, 0, 255);">WHERE</span> dbid <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 255);">DB_ID</span>(<span style="color: rgb(0, 128, 0);">@DatabaseName</span>)<br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">OPEN</span> curDBLogin<br/>
+<span style="color: rgb(0, 0, 255);">FETCH</span> <span style="color: rgb(0, 0, 255);">NEXT</span> <span style="color: rgb(0, 0, 255);">FROM</span> curDBLogin <span style="color: rgb(0, 0, 255);">INTO</span> <span style="color: rgb(0, 128, 0);">@SPID</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">WHILE</span> <span style="color: rgb(0, 128, 0); font-weight: bold;">@@FETCH_STATUS</span> <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">0</span><br/>
+   <span style="color: rgb(0, 0, 255);">BEGIN</span><br/>
+      <span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(0, 128, 0);">@SPID</span> <span style="color: rgb(128, 128, 128);">&lt;&gt;</span> <span style="color: rgb(0, 128, 0); font-weight: bold;">@@SPID</span><br/>
+          <span style="color: rgb(0, 0, 255);">EXEC</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">KILL </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(0, 128, 0);">@SPID</span> )<br/>
+      <span style="color: rgb(0, 0, 255);">FETCH</span> <span style="color: rgb(0, 0, 255);">NEXT</span> <span style="color: rgb(0, 0, 255);">FROM</span> curDBLogin <span style="color: rgb(0, 0, 255);">INTO</span> <span style="color: rgb(0, 128, 0);">@SPID</span><br/>
+   <span style="color: rgb(0, 0, 255);">END</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">CLOSE</span> curDBLogin<br/>
+<span style="color: rgb(0, 0, 255);">DEALLOCATE</span> curDBLogin<br/>
+<span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Kill logins of database</span><br/>
+<span style="color: rgb(0, 0, 255);">EXEC</span> dbo.USP_KillSPID <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">CommonControlDB</span><span style="color: rgb(255, 0, 0);">'</span> <br/>
+<br/>
+<span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Drop itself</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">PROCEDURE</span> dbo.USP_KillSPID</span></code></pre>
+</div>]
+</body>
+</html>

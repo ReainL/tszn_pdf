@@ -1,0 +1,75 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">Combining Sets</h2><p>不同的集合可以通过一定的方式组成新的集合，常提到的几种联合集合的方式如下图所示：</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/26180908-b5d0f7ecdaae4faaba19cf5e5cc8a541.png"/>                       </p><ul><li>Union 模式 – 两个集合连接在一起形成一个新的集合，这个新集合包含了左右两边集合的内容。</li><li>Intersection 模式 – 只有内容相同的一部分才能被保留下来形成一个新的集合。</li><li>Exception 模式 – 第一个集合不在第二个集合的范围，保留下来形成一个新的集合。</li></ul><p>语法 –</p><p>Union ({Set1}, {Set2} [, ALL])</p><p>Intersect ({Set1}, {Set2} [, ALL])</p><p>Exception ({Set1}, {Set2} [, ALL])</p><p>这三个函数都要求作为参数的两个集合必须属于同一个纬度，被函数返回的集合中的元组都是唯一的，相当于在返回的集合上使用了 DISTINCT 一样，除非使用 ALL 来标示不需要DISTINCT。</p><p>通常情况下，Union 和 Exception 使用的频率会多一些，所以MDX 语言为它们提供了一种更简单的表达方式。可以使用 + 和 – 来替代，但是这时就不能使用 ALL 标志了。</p><h2 id="articleHeader2">示例一 – 查询2004年零售额最高的10个产品</h2><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+TopCount(<br/>
+{[Product].[Product].[Product].Members},<br/>
+10,<br/>
+([Measures].[Reseller Sales Amount], [Date].[Calendar Year].[CY 2004])<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/26181021-3cbf4edb64ab4e8daa5cbcef1b9312fc.png"/></p><h2 id="articleHeader3">示例二 – 使用UNION 查询2003年和2004年各自零售额最高的10个产品</h2><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Union(<br/>
+　　TopCount(<br/>
+　　　　{[Product].[Product].[Product].Members},<br/>
+　　　　10,<br/>
+　　　　([Measures].[Reseller Sales Amount], [Date].[Calendar Year].[CY 2003])<br/>
+　　),<br/>
+　　TopCount(<br/>
+　　　　{[Product].[Product].[Product].Members},<br/>
+　　　　10,<br/>
+　　　　([Measures].[Reseller Sales Amount], [Date].[Calendar Year].[CY 2004])<br/>
+　　)<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/26181125-bf62dae921054d8d9e2bbfa178617039.png"/></p><p>总共只有12个产品查询出来，很显然有一些产品既在第一个集合中也在第二个集合中存在。</p><h2 id="articleHeader4">示例三 – 看看2013年的前10产品跌出了2014年前10</h2><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Except(<br/>
+　　　　TopCount(<br/>
+　　　　　　{[Product].[Product].[Product].Members},<br/>
+　　　　　　10,<br/>
+　　　　　　([Measures].[Reseller Sales Amount], [Date].[Calendar Year].[CY 2003])<br/>
+　　　　),<br/>
+　　　　TopCount(<br/>
+　　　　　　{[Product].[Product].[Product].Members},<br/>
+　　　　　　10,<br/>
+　　　　　　([Measures].[Reseller Sales Amount], [Date].[Calendar Year].[CY 2004])<br/>
+　　　　)<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/26181227-cbfd87e418e1456bb08ddfb44c51b384.png"/></p><h2 id="articleHeader5">示例四 – 2004年前10的产品不在2003年前10的有哪些</h2><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Except(<br/>
+　　TopCount(<br/>
+　　　　　　{[Product].[Product].[Product].Members},<br/>
+　　　　　　10,<br/>
+　　　　　　([Measures].[Reseller Sales Amount], [Date].[Calendar Year].[CY 2004])<br/>
+　　　　),<br/>
+　　TopCount(<br/>
+　　　　　　{[Product].[Product].[Product].Members},<br/>
+　　　　　　10,<br/>
+　　　　　　([Measures].[Reseller Sales Amount], [Date].[Calendar Year].[CY 2003])<br/>
+　　)<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/26181322-d67173218dda4f3891156a11eb983519.png"/></p><h2 id="articleHeader6">示例五 – 查看有哪些产品在2003年和2004年都是前10的</h2><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Intersect(<br/>
+　　　　TopCount(<br/>
+　　　　　　{[Product].[Product].[Product].Members},<br/>
+　　　　　　10,<br/>
+　　　　　　([Measures].[Reseller Sales Amount], [Date].[Calendar Year].[CY 2004])<br/>
+　　　　),<br/>
+　　　　TopCount(<br/>
+　　　　　　{[Product].[Product].[Product].Members},<br/>
+　　　　　　10,<br/>
+　　　　([Measures].[Reseller Sales Amount], [Date].[Calendar Year].[CY 2003])<br/>
+　　　　)<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/26181417-f7fe825a94e84d60a54477efcdd80353.png"/></p>
+</div>]
+</body>
+</html>

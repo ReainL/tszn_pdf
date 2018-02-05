@@ -1,0 +1,14 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>重装了一个虚拟机也重新安装了一个操作系统，结果忘记更改计算机名称就安装了 SQL SERVER。安装完成之后才发现计算机名没有改，于是又回去重新更改了一下。报表服务中，按照正常配置走下来，创建 Service Account，然后启动 RS 服务测试报表页面，结果却无法打开。</p><h2 id="articleHeader2">解决方式</h2><p>页面显示的错误无非就是指定的服务器无法找到，基本上可以判断出来就是更改计算机名称所引起来的问题。</p><p>第一次查看的时候服务器的名称确实没有修改过来。<br/></p><p><img alt="1.jpg" height="487" src="http://7xlhg3.com1.z0.glb.clouddn.com/uploads/article/20151022/937c2aae7abc927c3879f9b3c6872471.jpg" width="1047"/></p><p>在 Reporting Service 中也是一样。<br/></p><p><img alt="2.jpg" height="721" src="http://7xlhg3.com1.z0.glb.clouddn.com/uploads/article/20151022/a07d5605833d98ce0bab7d3726d535fa.jpg" width="957"/></p><p>解决的方式是：</p><p>先用 sp_dropserver 删除服务器，语句：EXEC sp_dropserver '老计算机名'</p><p>再用 sp_addserver 添加新的服务器，语句：EXEC SP_ADDSERVER '新计算机名','LOCAL'。</p><p>重启服务器之后还是不行，重启计算机之后还是不行。</p><p>回到这里发现名称还是没有更改，但是实际上在数据库表中名称已经全部更改过来了，所以可以肯定只是这里在前端配置时还是指向旧的服务器数据库地址。<br/></p><p><img alt="3.jpg" height="724" src="http://7xlhg3.com1.z0.glb.clouddn.com/uploads/article/20151022/38aa5a655413e187c9b273a4f4c35293.jpg" width="956"/></p><p>更改数据库选择已经存在的重新指定一下服务器和数据库。<br/></p><p><img alt="4.jpg" height="721" src="http://7xlhg3.com1.z0.glb.clouddn.com/uploads/article/20151022/ca53b6ee33b27223dc820f090eac5ceb.jpg" width="957"/></p><p><img alt="5.jpg" height="723" src="http://7xlhg3.com1.z0.glb.clouddn.com/uploads/article/20151022/bb8f799dacb457cbf2d80c7b0b83f35c.jpg" width="958"/></p><p><img alt="6.jpg" height="723" src="http://7xlhg3.com1.z0.glb.clouddn.com/uploads/article/20151022/2d70a0dfebece41545c4d8137abde1a1.jpg" width="956"/></p><p>配置完成之后还是无法打开，Delete Encrypted Content <br/></p><p><img alt="7.jpg" height="723" src="http://7xlhg3.com1.z0.glb.clouddn.com/uploads/article/20151022/61d4107182afa3f1d6bdad0a620c57c9.jpg" width="958"/></p><p>刷新新页面可以搞定了。</p><p><img alt="9.jpg" height="836" src="http://7xlhg3.com1.z0.glb.clouddn.com/uploads/article/20151022/c5277bc647c140716aab73564a1baec2.jpg" width="1270"/><br/></p>
+<ul class="aw-upload-file-list">
+</ul>
+</div>]
+</body>
+</html>

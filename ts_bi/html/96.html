@@ -1,0 +1,62 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>除了之前的几篇文章中出现的时间维度，雪花型维度的设计之外还有一种比较特殊的维度 - 父子维度。父子维度特殊就特殊在它包含了一种基于递归关系(Recursive Relationship)的引用结构，在我的这篇文章中提到了如何基于父子层次结构来设计和制作 SSRS 报表，不过那个报表是基于数据仓库的。而现在我们要设计的是基于父子结构的维度，在此基础之上我们也可以设计出基于 SSAS 数据库的 SSRS 报表。</p><h2 id="articleHeader2">案例设计</h2><p>下面仍然是我们的测试表和数据，测试表包含了一个员工维度表和销售的事实表。</p><pre><code><span style="font-family: Microsoft Yahei; font-size: 14px;"><span style="color: rgb(0, 0, 255);">USE</span><span> BIWORK_SSIS<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">FactResellerSales</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> FactResellerSales<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span> <br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimEmployee</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> DimEmployee<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span> <br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span><span> EmployeeKey,<br/>
+       ParentEmployeeKey,<br/>
+       EmployeeNationalIDAlternateKey,<br/>
+       </span><span style="color: rgb(255, 0, 255);">CASE</span> <span style="color: rgb(0, 0, 255);">WHEN</span> <span style="color: rgb(255, 0, 255);">ISNULL</span>(MiddleName,<span style="color: rgb(255, 0, 0);">''</span>) <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">''</span>  <span style="color: rgb(0, 0, 255);">THEN</span> FirstName <span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(128, 128, 128);">+</span><span> LastName  <br/>
+            </span><span style="color: rgb(0, 0, 255);">ELSE</span> FirstName <span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(128, 128, 128);">+</span> MiddleName <span style="color: rgb(128, 128, 128);">+</span><span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(128, 128, 128);">+</span><span>LastName<br/>
+       </span><span style="color: rgb(0, 0, 255);">END</span> <span style="color: rgb(0, 0, 255);">AS</span><span> FullName,<br/>
+       Title <br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span> DimEmployee<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span> AdventureWorksDW2012.dbo.DimEmployee</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span><span> ProductKey,<br/>
+       OrderDateKey,<br/>
+       EmployeeKey,<br/>
+       SalesOrderLineNumber,<br/>
+       SalesOrderNumber,<br/>
+       UnitPrice,<br/>
+       ProductStandardCost,<br/>
+       SalesAmount<br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span> FactResellerSales<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span> AdventureWorksDW2012.dbo.FactResellerSales<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> DimEmployee <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_EmployeeKey <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span> (EmployeeKey)<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> DimEmployee<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_ParentEmployeeKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(ParentEmployeeKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span> DimEmployee(EmployeeKey)<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> FactResellerSales <br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> PK_Reseller_OrderLineNumber_OrderNumber <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">CLUSTERED</span><span> (SalesOrderLineNumber,SalesOrderNumber)<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">ALTER</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> FactResellerSales<br/>
+</span><span style="color: rgb(0, 0, 255);">ADD</span> <span style="color: rgb(0, 0, 255);">CONSTRAINT</span> FK_EmployeeKey <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span>(EmployeeKey) <span style="color: rgb(0, 0, 255);">REFERENCES</span><span> DimEmployee(EmployeeKey)<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span> DimEmployee<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span> FactResellerSales</span></code></pre><p>员工表中的 ParentEmployeeKey 指向了自身的主键 EmployeeKey，而 FactResellerSales 中的主键是由 SalesOrderLineNumber 和 SalesOrderNumber 构成的一个复合主键，并且 EmployeeKey  指向了 DimEmployee 的 EmployeeKey。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23171737-667ae132f6544f88a824d505f56f7b8e.png"/></p><p>创建一个 SSAS 项目并创建数据源和数据源视图。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23171752-02f09ce988d84260ab66dd4a237d8f00.png"/></p><p>新建一个维度，并选择 EmployeeKey 作为 Key Column、FullName 作为 Name Column 来展现标签信息。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23171807-7faa230bce304355afc02d99f54a1900.png"/></p><p>选择属性，因为 FullName 已经作为 Employee Key 的 Name Column，因此不会在这里显示了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23171821-af057a190c31446ab16976088b745c17.png"/></p><p>修改一下属性的名字。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23171839-0512e0af417e49c799136a8ce0716519.png"/></p><p>下一步并给维度取一个名字 Employee 保存之后就能看到这个维度了，并且可以看到 Employees 属性有一个自引用的结构特征。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23171851-533c54b99f5a4bc89a58a4f4013b5cb1.png"/></p><p>查看 Employee 属性， Usage 是 Key。 在这里一定要注意，父子关系层次结构中的子级必须是维度的关键属性，所以 Employee 这里的 Usage 必须是 Key 。</p><p> <img alt="" src="http://images.cnitblog.com/blog/477275/201312/23171901-35950a6bdba9473dbfaeb8bf87caa40d.png"/></p><p>而 Employees 其实就是对应的 ParentEmployeeKey，它的 Usage 必须是 Parent 才能表示这样的一个父子维度。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23171914-f5a290ae3d2046d28c7980419de141fb.png"/></p><p>并且要注意的是每一个维度有且只能有一个属性的 Usage 属性能够被设置为 Key。这里别混淆了维度属性和数据库字段(属性)，作为维度属性中的 Key 有可能是由数据库中的一个或者多个字段构成的复合主键组成的，这个 Key 在维度属性中只能有一个。</p><p>如果是父子维度，那么有且仅有一个属性的 Usage 属性的值被设置为 Parent，所有其它的属性的 Usage 属性的值均为 Regular。</p><p>部署并浏览属性层次结构 ，注意到 Employee 属性层次结构并没有显示出来。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23171927-dfd4a11274ec47ef8bb6efa1d0f76b65.png"/></p><p>这是因为在创建父子维度的过程中，它的 AttributeHierarchyVisible 默认被设置成了 False。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23171943-bde4a5ac1d264eaca947179be703f7f0.png"/></p><p>除此之外，我们还可以修改 Employees 的  MemberWithDataCaption 属性来标记数据成员，以及 Naming Template 来表示不同的级别的属性。IsAggregatable 属性也修改为 False, 这样就不会出现 ALL 这一个级别的成员了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23171956-32ea3315b94745d7a4678dd9136607d6.png"/></p><p>因为没有了 ALL 这个级别的成员，因此可以选择一个成员作为默认成员。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23172009-d48b7b5e51ee42f48d7cb6704870909c.png"/></p><p>再次部署之后就能看到不同的级别上人员信息就有了级别信息了，在这个例子中由于源数据包含了部分历史维度信息，所以能看到两个相同的 David M Bradley 和 Laura F Norman，关于这些历史数据就不在我们的讨论范围之内了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/23172033-3542b0c08d394dd68384bebb8bffd81e.png"/></p><p> </p><p>PS：补充一下相关天善论坛里的一个问题 - <a href="http://www.flybi.net/question/1293"><u><font color="#0066cc">SSAS 在层次结构里面，如何不看自己 </font></u></a></p><p>相关设置如下：</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04115344-e93c74b10b344893bed53e97bd439769.png"/></p><p>设置前 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04115353-a09cdbbbae70470f873c932176e46dd8.png"/></p><p>设置后 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/04115402-4f0ab8cce48e4f3d86042ff6bfa63ef7.png"/><br/></p>
+</div>]
+</body>
+</html>

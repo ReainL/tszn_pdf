@@ -1,0 +1,396 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>一直准备写这么一篇有关 SSIS 日志系统的文章，但是发现很难一次写的很完整。因为这篇文章的内容可扩展的性太强，每多扩展一部分就意味着需要更多代码，示例和理论支撑。因此，我选择我觉得比较通用的 LOG 部分，在这里分享一下给大家，希望对大家在设计 ETL 的日志系统时有所启发和帮助。当然在这里要区分 Logging 和 Auditing 的区别，Logging 主要用来记录发生了什么事情，Auditing 侧重描述过程中产生的数据量，新增了多少，修改了多少等记录条数。本文主要讲解 Log 部分，以后有时间再来讲解如何在 Log System 中集成 Auditing 的功能。（本博客从博客园迁入商业智能 BI 社区 by BIWORK 2015年9月23日）</p><ol><li>首先，在这里提出几个问题，可以试着回答一下？</li><li>假设我们项目中，一个项目中最终上线的 ETL 包多达上百个，如何对这些包进行统一的日志管理 ？</li><li>现在在线运行的 ETL 包有多少个？ 多长时间？ 哪些包的运行时间最长，哪些最少 ？ 项目经理需要一份图表能够反映出这些 KPI 来。</li><li>每天运行的 ETL 包有多少个？ 测试环境，开发环境上都跑了多少个 ?</li><li>如何快速查询每个包运行的状态，成功否，失败否，失败的原因等等 ？</li><li>每个包都有一个配置文件，几百个包的配置文件又是如何进行管理的 ？ 这些配置文件中都有些什么内容 ？现在配置的参数都各自是什么？</li><li>这些包各自大概属于哪些部门使用的？业务范围是什么？ 这些包失败了找谁？ 谁开发的？</li><li>哪些包是用来加载文件，输出文件的，哪些包只是用来一般的数据转换的 ？ 输入文件在哪里 ？ 输出文件在哪里 ？</li><li>随便给出一个 SSIS Package 的名称，你知道它大概是做什么的吗？</li><li>每周的项目会议中，考虑过没有拿出上面的这些答案，数据，图表来对付各个老大们的提问 ？</li><li>.........</li></ol><p>这些问题其实都是应该要好好考虑的，并且完全可以在项目开发之初，花上一天或几天时间搭建与适用于当前项目的日志系统，然后再花上一定时间对这套日志系统的报表完成设计和开发。在解决上述问题的同时，我相信受益的不仅仅是各个工作在一线的开发者，不仅仅可以提高他们的工作效率，而且在后期可以减少大量维护运营 ETL 的人力和时间成本。</p><h2 id="articleHeader2">本文将分为以下几个部分来阐述</h2><ol><li>日志系统的在 ETL 项目中的位置</li><li>日志系统的角色构成</li><li>日志系统的数据库对象</li><li>日志系统在 SSIS Package 中的使用</li><li>SSIS Package 配置管理在日志系统中的集成</li><li>SSIS Package 模板开发</li><li>日志系统的报表开发</li></ol><h2 id="articleHeader3">一. 日志系统的在 ETL 项目中的位置</h2><p>日志系统简单来说就是一个数据库，里面有一些维护和管理日志数据的数据表以及一些视图或者存储过程构成。它在 ETL 项目中的位置应该独立于其它任意数据库，比如 BI 项目中的 Staging 数据库，DW 数据库以及各种各样的 Transaction 数据库。在一个服务器中，可能我们因为业务的原因，系统中存在一个或者多个 Staging 数据库，DW 数据库，但是日志数据库只有一个。这个日志数据库是所有包含 ETL Package 项目的真正核心，它管理和维护着各个 ETL Package 中的所有日志状态，包配置，主题划分等信息和内容。 而这些 ETL 所做的事情就是在各个数据源，目的地数据库中间抽取，转换，存储数据的工作，所有的工作操作记录将保存在日志系统中。假设这个日志数据的名称就叫做 BIWorkLog，当然有我在博客园的 ID - BIWork，但字面意思更容易理解 - BI 工作日志 ：）。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182056169063087.png"/></p><p> </p><h2 id="articleHeader4">二. 日志系统的角色构成</h2><p> <img alt="" src="http://images.cnitblog.com/blog/477275/201402/182103163691070.png"/></p><p>所谓角色构成即它们在日志系统中扮演的角色。</p><p><strong>Business Scope </strong>- 我给它的定义就是业务边界，什么叫做业务边界。假设 ETL 系统中开发并部署了上百个 SSIS Package，这些 Package 肯定有来自不同的 Group 的吧，比如市场部门的，财务部门的。自然市场部门的业务主要是围绕市场方面的 ETL 需求，财务部门的主要围绕财务部门的。当然换另外一种说法，我们在开发项目定义需求的时候，会有模块划分，也会定义出业务主题和边界。那么这里的 Business Scope 就是这种作用，对 ETL 做出主题划分，并且这里的 Business Scope 将贯穿 ETL 设计过程的始终。比如 ETL 的命名首先就以 Business Scope 开头，当看到这个 ETL 的时候就大概知道这个 ETL 也什么业务范围的了。 记住：命名规范在哪里都使用。</p><p><strong>Solution </strong>- Solution 和上面的 Business Scope 的含义也比较类似，但是面要更小一些。通常情况下，会把相同业务或者相关业务的 ETL 创建在同一个项目中，这里的解决方案就可以描述为 Business Scope ,而项目的名称可以描述为 Solution，然后下面会有很多的 ETL SSIS Package。ETL 的命名和它也有关系，BusinessScopeName_SolutionName_XXX。当然，这里的 Solution 和 创建项目中的 Solution 含义上有点小小的区别。</p><p><strong>Solution ETL</strong> - Solution 下的具体 SSIS Package，这是真正的运行数据加载，清洗和转换的包的定义区域。而日志功能就是围绕 Solution ETL 来进行记录的。</p><p>Data Flow - 数据流，数据流类型。比如文件的加载有 Input 有 Output 方向的，也有同时兼备 Input 和 Output 的。非文件的 ETL 数据流类型那就是普通的 Transformation 了。任何的 ETL 无非就是这些类型，将 Data Flow 的类型定义在 ETL 的命名上， BusinessScopeName_SolutionName_DataFlowType_XXX。是不是随便在上百个或者上千个 SSIS Package 中挑出一个，一看 ETL 命名就大概知道这个 ETL 属于哪个业务范围，哪个 Solution，是做文件加载还是文件输出 ？ 这些信息是不是一目了然 ？</p><p><strong>Execution Status </strong>- 执行状态，ETL 的执行状态，就三种 - 成功，失败和执行中。</p><p><strong>Configuration </strong>- 所有包的配置都应该集中管理，不应该分散到各个 XML 格式的配置文件中，而应该集中到我这里提到的 Configuration 中。</p><p><strong>Process Log</strong> - 所有包运行的记录也都应该集中管理，它们的运行记录也都应该集中在一个地方进行管理和跟踪。我见过不同公司不同的项目，每创建一个 ETL 就是一份 XML 配置文件，一个 SSIS 自动生成的 Process Log。当整个项目中就几个 ETL Package 的时候，确实没有什么问题，完成部署也很快，很容易。但是如果能稍微花点时间认真搭建一个属于自己项目的日志系统，所有人共同遵守的话，我可以说后续的开发，维护，新人学习，管理等时间和人力成本将会节省更多。</p><p><strong>Error Log </strong>- 伴随着 Process Log ，但有所区别，它只记录错误消息。</p><h2 id="articleHeader5">三. 日志系统的数据库对象</h2><p>上面的这些角色反映在数据库中就是下面的这些数据库对象了，可以很容易看到它们之间的关系。注意 - SSIS Configurations 这张表不是直接创建的，而是第一次在设计 ETL 模板的时候创建的，后面会介绍到。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182138228216736.png"/></p><p>详细创建这些对象的脚本也提供给大家使用，在此基础之上可以扩展 Auditing 的工具，包括输入，输出文件的记录，Archive 文件的记录，表记录的更改条数，新增条数，正确率，错误率等记录都可以基于上面的 Process Log 进行扩展。我可以在以后再单独写一篇 Auditing 方面的内容，来介绍如何集成 SSIS 自身 Log 来记录这些 Audit Data。<img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif"/></p><pre><code><span style="font-family: Microsoft YaHei;"><span style="color: rgb(0, 0, 255);">USE</span><span style="color: rgb(0, 0, 0);"> BIWORKLOG<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);">--------------------------------------------------------------------</span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);"> Create BIWORK Log System </span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);"> by BIWORK at <a href="http://www.flybi.net/blog">http://www.flybi.net/blog</a>/biwork<span style="color: rgb(0, 128, 128);"></span></span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);">--------------------------------------------------------------------</span><br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">dbo.ERROR_LOG</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.ERROR_LOG<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">dbo.[SSIS CONFIGURATIONS]</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span> dbo.<span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);">SSIS CONFIGURATIONS</span><span style="color: rgb(255, 0, 0);">]</span> <br/>
+<span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">dbo.PROCESS_LOG</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.PROCESS_LOG<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">dbo.SOLUTION_ETL</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION_ETL<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">dbo.SOLUTION</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">dbo.BUSINESS_SCOPE</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.BUSINESS_SCOPE <br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">dbo.EXECUTE_STATUS</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.EXECUTE_STATUS <br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span> <br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">dbo.DATA_FLOW_TYPE</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.DATA_FLOW_TYPE <br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span> <br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.BUSINESS_SCOPE<br/>
+(<br/>
+    SCOPE_ID </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(255, 0, 255);">IDENTITY</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>,<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span><span style="color: rgb(0, 0, 0);">),<br/>
+    SCOPE_NAME </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span><span style="color: rgb(0, 0, 0);">),<br/>
+    SCOPE_SHORT_NAME </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">10</span><span style="color: rgb(0, 0, 0);">),<br/>
+    SCOPE_DESC </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span><span style="color: rgb(0, 0, 0);">),<br/>
+    SCOPE_OWNER </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span><span style="color: rgb(0, 0, 0);">),<br/>
+    SCOPE_OWNER_EMAIL </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    CREATE_USER </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    CREATE_TIME </span><span style="color: rgb(0, 0, 255);">DATETIME</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);"><br/>
+) <br/>
+</span><span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION<br/>
+(<br/>
+    SOLUTION_ID </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(255, 0, 255);">IDENTITY</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>,<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span><span style="color: rgb(0, 0, 0);">),<br/>
+    SCOPE_ID </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> dbo.BUSINESS_SCOPE(SCOPE_ID),<br/>
+    SOLUTION_NAME </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    SOLUTION_SHORT_NAME </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">10</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    SOLUTION_DESC </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">2000</span>) <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    SOLUTION_OWNER </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    OWNER_EMAIL </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    SOLUTION_START </span><span style="color: rgb(0, 0, 255);">DATETIME</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    CREATE_USER </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    CREATE_TIME </span><span style="color: rgb(0, 0, 255);">DATETIME</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);"><br/>
+) <br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.DATA_FLOW_TYPE<br/>
+(<br/>
+    FLOW_TYPE_ID </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span><span style="color: rgb(0, 0, 0);">,<br/>
+    FLOW_TYPE </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">10</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    FLOW_DESC </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    CREATE_USER </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    CREATE_TIME </span><span style="color: rgb(0, 0, 255);">DATETIME</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);"><br/>
+)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">INTO</span> dbo.DATA_FLOW_TYPE <span style="color: rgb(0, 0, 255);">VALUES</span><span style="color: rgb(0, 0, 0);"><br/>
+(</span><span style="color: rgb(128, 0, 0); font-weight: bold;">10</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">OUTPUT</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">To output data from database tables to destination files.</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 255);">SYSTEM_USER</span>,<span style="color: rgb(255, 0, 255);">GETDATE</span><span style="color: rgb(0, 0, 0);">()), <br/>
+(</span><span style="color: rgb(128, 0, 0); font-weight: bold;">11</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">INPUT</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">To load data from files to destination database tables.</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 255);">SYSTEM_USER</span>,<span style="color: rgb(255, 0, 255);">GETDATE</span><span style="color: rgb(0, 0, 0);">()),<br/>
+(</span><span style="color: rgb(128, 0, 0); font-weight: bold;">12</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">INOUTPUT</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">To load data from files and output data to files.</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 255);">SYSTEM_USER</span>,<span style="color: rgb(255, 0, 255);">GETDATE</span><span style="color: rgb(0, 0, 0);">()),<br/>
+(</span><span style="color: rgb(128, 0, 0); font-weight: bold;">20</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">TRANS</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">Data transformation without files</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 255);">SYSTEM_USER</span>,<span style="color: rgb(255, 0, 255);">GETDATE</span><span style="color: rgb(0, 0, 0);">())<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION_ETL<br/>
+(<br/>
+    ETL_ID </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(255, 0, 255);">IDENTITY</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>,<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span><span style="color: rgb(0, 0, 0);">),<br/>
+    SOLUTION_ID </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION(SOLUTION_ID),<br/>
+    FLOW_TYPE_ID </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> dbo.DATA_FLOW_TYPE(FLOW_TYPE_ID),<br/>
+    ETL_NAME </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    ETL_PACKAGE_NAME </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    ETL_DESC </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">2000</span>) <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    ETL_FST_OWNER </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    ETL_FST_OWNER_EMAIL </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    ETL_SEC_OWNER </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    ETL_SEC_OWNER_EMAIL </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    CREATE_USER </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    CREATE_TIME </span><span style="color: rgb(0, 0, 255);">DATETIME</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);"><br/>
+)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.EXECUTE_STATUS<br/>
+(<br/>
+    STATUS_ID </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span><span style="color: rgb(0, 0, 0);">,<br/>
+    STATUS_DESC </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">25</span><span style="color: rgb(0, 0, 0);">)<br/>
+)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.PROCESS_LOG<br/>
+(<br/>
+    PROCESS_LOG_ID </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(255, 0, 255);">IDENTITY</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>,<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span><span style="color: rgb(0, 0, 0);">),<br/>
+    ETL_ID </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION_ETL(ETL_ID),<br/>
+    PACKAGE_NAME </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    MACHINE_NAME </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    EXECUTE_USER </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    START_TIME </span><span style="color: rgb(0, 0, 255);">DATETIME</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    FINISH_TIME </span><span style="color: rgb(0, 0, 255);">DATETIME</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    EXECUTE_STATUS_ID </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> dbo.EXECUTE_STATUS(STATUS_ID)<br/>
+)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> dbo.ERROR_LOG<br/>
+(<br/>
+    ERROR_LOG_ID </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">PRIMARY</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(255, 0, 255);">IDENTITY</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>,<span style="color: rgb(128, 0, 0); font-weight: bold;">1</span><span style="color: rgb(0, 0, 0);">),<br/>
+    PROCESS_LOG_ID </span><span style="color: rgb(0, 0, 255);">INT</span> <span style="color: rgb(0, 0, 255);">FOREIGN</span> <span style="color: rgb(0, 0, 255);">KEY</span> <span style="color: rgb(0, 0, 255);">REFERENCES</span><span style="color: rgb(0, 0, 0);"> dbo.PROCESS_LOG(PROCESS_LOG_ID),<br/>
+    ERROR_MSG </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(255, 0, 255);">MAX</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">, <br/>
+    COMPONENT_NAME </span><span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span>) <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+    CREATE_TIME </span><span style="color: rgb(0, 0, 255);">DATETIME</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);"><br/>
+)<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">INTO</span> dbo.EXECUTE_STATUS <span style="color: rgb(0, 0, 255);">VALUES</span><span style="color: rgb(0, 0, 0);"><br/>
+(</span><span style="color: rgb(128, 128, 128);">-</span><span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">ERROR</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">),<br/>
+(</span><span style="color: rgb(128, 0, 0); font-weight: bold;">0</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">IN PROCESS</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">),<br/>
+(</span><span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">FINISH</span><span style="color: rgb(255, 0, 0);">'</span>)</span></code></pre><p>插入日志的存储过程 - USP_COMMON_COMBI_INSERT_START_LOG</p><pre><code><span style="font-family: Microsoft YaHei;"><span style="color: rgb(0, 0, 255);">USE</span><span style="color: rgb(0, 0, 0);"> BIWORKLOG<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);">--------------------------------------------------------------------</span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);"> USP_COMMON_COMBI_INSERT_START_LOG </span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);"> by BIWORK at <a href="http://www.flybi.net/blog">http://www.flybi.net/blog</a>/biwork<span style="color: rgb(0, 128, 128);"></span><span style="color: rgb(0, 128, 128);"></span></span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);">--------------------------------------------------------------------</span><br/>
+<span style="color: rgb(0, 0, 255);">SET</span> NOCOUNT <span style="color: rgb(0, 0, 255);">ON</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">USP_COMMON_COMBI_INSERT_START_LOG</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">P</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">PROCEDURE</span><span style="color: rgb(0, 0, 0);"> USP_COMMON_COMBI_INSERT_START_LOG<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">PROCEDURE</span><span style="color: rgb(0, 0, 0);"> USP_COMMON_COMBI_INSERT_START_LOG<br/>
+    </span><span style="color: rgb(0, 128, 0);">@ETL_ID</span> <span style="color: rgb(0, 0, 255);">INTEGER</span><span style="color: rgb(0, 0, 0);">,<br/>
+    </span><span style="color: rgb(0, 128, 0);">@PACKAGE_NAME</span> <span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span><span style="color: rgb(0, 0, 0);">),<br/>
+    </span><span style="color: rgb(0, 128, 0);">@MACHINE_NAME</span> <span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span><span style="color: rgb(0, 0, 0);">),<br/>
+    </span><span style="color: rgb(0, 128, 0);">@EXECUTE_USER</span> <span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span><span style="color: rgb(0, 0, 0);">),<br/>
+    </span><span style="color: rgb(0, 128, 0);">@START_TIME</span> <span style="color: rgb(0, 0, 255);">DATETIME</span><span style="color: rgb(0, 0, 0);">,<br/>
+    </span><span style="color: rgb(0, 128, 0);">@PROCESS_LOG_ID</span> <span style="color: rgb(0, 0, 255);">INTEGER</span><span style="color: rgb(0, 0, 0);"> OUTPUT<br/>
+</span><span style="color: rgb(0, 0, 255);">AS</span><br/>
+<span style="color: rgb(0, 0, 255);">BEGIN</span><br/>
+    <br/>
+    <span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> dbo.PROCESS_LOG<br/>
+    (<br/>
+        ETL_ID,<br/>
+        PACKAGE_NAME,<br/>
+        MACHINE_NAME,<br/>
+        EXECUTE_USER,<br/>
+        START_TIME,<br/>
+        EXECUTE_STATUS_ID<br/>
+    )<br/>
+    </span><span style="color: rgb(0, 0, 255);">VALUES</span><span style="color: rgb(0, 0, 0);"><br/>
+    (<br/>
+        </span><span style="color: rgb(0, 128, 0);">@ETL_ID</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(0, 128, 0);">@PACKAGE_NAME</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(0, 128, 0);">@MACHINE_NAME</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(0, 128, 0);">@EXECUTE_USER</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(0, 128, 0);">@START_TIME</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(128, 0, 0); font-weight: bold;">0</span> <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> IN PROCESS</span><br/>
+<span style="color: rgb(0, 0, 0);">    )<br/>
+<br/>
+    </span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(0, 128, 0);">@PROCESS_LOG_ID</span> <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(0, 128, 0); font-weight: bold;">@@IDENTITY</span><br/>
+<span style="color: rgb(0, 0, 255);">END</span></span></code></pre><p>更新结束 Log 的存储过程 - USP_COMMON_COMBI_UPDATE_END_LOG</p><pre><code><p><span style="font-family: Microsoft YaHei;"><span style="color: rgb(0, 0, 255);">USE</span><span style="color: rgb(0, 0, 0);"> BIWORKLOG<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);">--------------------------------------------------------------------</span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);"> USP_COMMON_COMBI_UPDATE_END_LOG </span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);"> by BIWORK at <a href="http://www.flybi.net/blog/biwork">http://www.flybi.net/blog/biwork</a></span></span></p><p><span style="font-family: Microsoft YaHei;"><span style="color: rgb(0, 128, 128);"><span style="color: rgb(0, 128, 128);"></span><span style="color: rgb(0, 128, 128);"></span></span><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);">--------------------------------------------------------------------</span><br/>
+<span style="color: rgb(0, 0, 255);">SET</span> NOCOUNT <span style="color: rgb(0, 0, 255);">ON</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">USP_COMMON_COMBI_UPDATE_END_LOG</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">P</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">PROCEDURE</span><span style="color: rgb(0, 0, 0);"> USP_COMMON_COMBI_UPDATE_END_LOG<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">PROCEDURE</span><span style="color: rgb(0, 0, 0);"> USP_COMMON_COMBI_UPDATE_END_LOG <br/>
+    </span><span style="color: rgb(0, 128, 0);">@EXECUTE_STATUS_ID</span> <span style="color: rgb(0, 0, 255);">INTEGER</span><span style="color: rgb(0, 0, 0);">,<br/>
+    </span><span style="color: rgb(0, 128, 0);">@PROCESS_LOG_ID</span> <span style="color: rgb(0, 0, 255);">INTEGER</span><br/>
+<span style="color: rgb(0, 0, 255);">AS</span><br/>
+<span style="color: rgb(0, 0, 255);">BEGIN</span><br/>
+    <br/>
+    <span style="color: rgb(0, 0, 255);">UPDATE</span><span style="color: rgb(0, 0, 0);"> dbo.PROCESS_LOG<br/>
+    </span><span style="color: rgb(0, 0, 255);">SET</span> FINISH_TIME <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 255);">GETDATE</span><span style="color: rgb(0, 0, 0);">(),<br/>
+        EXECUTE_STATUS_ID </span><span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(0, 128, 0);">@EXECUTE_STATUS_ID</span><br/>
+    <span style="color: rgb(0, 0, 255);">WHERE</span> PROCESS_LOG_ID <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(0, 128, 0);">@PROCESS_LOG_ID</span><br/>
+    <br/>
+<span style="color: rgb(0, 0, 255);">END</span></span></p></code></pre><p>插入错误日志的存储过程 - USP_COMMON_COMBI_INSERT_ERROR_LOG</p><pre><code><span style="font-family: Microsoft YaHei;"><span style="color: rgb(0, 0, 255);">USE</span><span style="color: rgb(0, 0, 0);"> BIWORKLOG<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);">--------------------------------------------------------------------</span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);"> USP_COMMON_COMBI_INSERT_ERROR_LOG</span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);"> by BIWORK at <a href="http://www.flybi.net/blog">http://www.flybi.net/blog</a>/biwork<span style="color: rgb(0, 128, 128);"></span><span style="color: rgb(0, 128, 128);"></span></span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);">--------------------------------------------------------------------</span><br/>
+<span style="color: rgb(0, 0, 255);">SET</span> NOCOUNT <span style="color: rgb(0, 0, 255);">ON</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">USP_COMMON_COMBI_INSERT_ERROR_LOG</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">P</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">PROCEDURE</span><span style="color: rgb(0, 0, 0);"> USP_COMMON_COMBI_INSERT_ERROR_LOG<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">PROCEDURE</span><span style="color: rgb(0, 0, 0);"> USP_COMMON_COMBI_INSERT_ERROR_LOG<br/>
+    </span><span style="color: rgb(0, 128, 0);">@PROCESS_LOG_ID</span> <span style="color: rgb(0, 0, 255);">INTEGER</span><span style="color: rgb(0, 0, 0);">,<br/>
+    </span><span style="color: rgb(0, 128, 0);">@ERROR_MESSAGE</span> <span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span><span style="color: rgb(0, 0, 0);">),<br/>
+    </span><span style="color: rgb(0, 128, 0);">@COMPONENT_NAME</span> <span style="color: rgb(0, 0, 255);">NVARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">255</span><span style="color: rgb(0, 0, 0);">) <br/>
+</span><span style="color: rgb(0, 0, 255);">AS</span><br/>
+<span style="color: rgb(0, 0, 255);">BEGIN</span><br/>
+    <br/>
+    <span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> dbo.ERROR_LOG<br/>
+    (<br/>
+        PROCESS_LOG_ID,<br/>
+        ERROR_MSG,<br/>
+        COMPONENT_NAME,<br/>
+        CREATE_TIME<br/>
+    ) <br/>
+    </span><span style="color: rgb(0, 0, 255);">VALUES</span><span style="color: rgb(0, 0, 0);"><br/>
+    (<br/>
+        </span><span style="color: rgb(0, 128, 0);">@PROCESS_LOG_ID</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(0, 128, 0);">@ERROR_MESSAGE</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(0, 128, 0);">@COMPONENT_NAME</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 255);">GETDATE</span><span style="color: rgb(0, 0, 0);">()<br/>
+    )<br/>
+</span><span style="color: rgb(0, 0, 255);">END</span></span></code></pre><h2 id="articleHeader6">四. 日志系统在 SSIS Package 中的使用</h2><p>在每个项目开发之初，特别是新项目，按照我们上面提到的内容，我们首先应该就是定义好我们的 Business Scope, Solution, Solution ETL 这些内容。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182148475588030.png"/></p><p>先后定义:</p><ol><li>Business Scope -  COMMON_BIWORK_LOG ，短名称 - COMMON</li><li>Solution - COMMON_BI，短名称 - COMBI</li><li>ETL - ETL_TEMPLATE， ETL 包的全名即 SSIS Package 的文件名在这里就定义成了  BusinessScope_Solution_DataType_ETL 全名即 -  COMMON_COMBI_TRANS_ETL_TEMPLATE</li></ol><p>那么一看这个包的名称，即使是一个新人，经过简单的项目框架培训，是不是一看这个包的名称就基本知道这个包是用来做什么的了。 下面这个脚本，应该在项目开发过程之前来执行，缺什么就定义什么。<img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif"/></p><pre><code><span style="font-family: Microsoft YaHei;"><span style="color: rgb(0, 0, 255);">USE</span><span style="color: rgb(0, 0, 0);"> BIWORKLOG<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);">--------------------------------------------------------------------</span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);"> Create BIWORK Log System </span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);"> by BIWORK at <a href="http://www.flybi.net/blog">http://www.flybi.net/blog</a>/biwork<span style="color: rgb(0, 128, 128);"></span><span style="color: rgb(0, 128, 128);"></span></span><span style="color: rgb(0, 128, 128);"><br/>
+--</span><span style="color: rgb(0, 128, 128);">--------------------------------------------------------------------</span><br/>
+<span style="color: rgb(0, 0, 255);">DECLARE</span> <span style="color: rgb(0, 128, 0);">@BUSINESS_SCOPE_ID</span> <span style="color: rgb(0, 0, 255);">INT</span><br/>
+<span style="color: rgb(0, 0, 255);">DECLARE</span> <span style="color: rgb(0, 128, 0);">@SOLUTION_ID</span> <span style="color: rgb(0, 0, 255);">INT</span><br/>
+<span style="color: rgb(0, 0, 255);">DECLARE</span> <span style="color: rgb(0, 128, 0);">@SOLUTION_ETL_ID</span> <span style="color: rgb(0, 0, 255);">INT</span><br/>
+<br/>
+<span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Set the BUSINESS SCOPE ID</span><br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(128, 128, 128);">EXISTS</span><span style="color: rgb(0, 0, 0);">(<br/>
+                </span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> SCOPE_ID<br/>
+                </span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> dbo.BUSINESS_SCOPE <br/>
+                </span><span style="color: rgb(0, 0, 255);">WHERE</span> SCOPE_NAME <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">COMMON_BIWORK_LOG</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);"><br/>
+             )<br/>
+</span><span style="color: rgb(0, 0, 255);">BEGIN</span><br/>
+    <span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> dbo.BUSINESS_SCOPE<br/>
+    (<br/>
+        SCOPE_NAME,<br/>
+        SCOPE_SHORT_NAME,<br/>
+        SCOPE_DESC,<br/>
+        SCOPE_OWNER,<br/>
+        SCOPE_OWNER_EMAIL,<br/>
+        CREATE_USER,<br/>
+        CREATE_TIME<br/>
+    )</span><span style="color: rgb(0, 0, 255);">VALUES</span><span style="color: rgb(0, 0, 0);"><br/>
+    (<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">COMMON_BIWORK_LOG</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">COMMON</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">Common BIWORK ETL log system</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">BIWORK</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">biwork@126.com</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 255);">SYSTEM_USER</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 255);">GETDATE</span><span style="color: rgb(0, 0, 0);">()<br/>
+    )  <br/>
+</span><span style="color: rgb(0, 0, 255);">END</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(0, 128, 0);">@BUSINESS_SCOPE_ID</span> <span style="color: rgb(128, 128, 128);">=</span><span style="color: rgb(0, 0, 0);"> SCOPE_ID<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> dbo.BUSINESS_SCOPE <br/>
+</span><span style="color: rgb(0, 0, 255);">WHERE</span> SCOPE_NAME <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">COMMON_BIWORK_LOG</span><span style="color: rgb(255, 0, 0);">'</span><br/>
+<br/>
+<span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Set the SOLUTION ID</span><br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(128, 128, 128);">EXISTS</span><span style="color: rgb(0, 0, 0);">(<br/>
+                </span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> SOLUTION_ID<br/>
+                </span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION <br/>
+                </span><span style="color: rgb(0, 0, 255);">WHERE</span> SOLUTION_NAME <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">COMMON_BI</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);"><br/>
+             ) <br/>
+</span><span style="color: rgb(0, 0, 255);">BEGIN</span><br/>
+    <span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION <br/>
+    (<br/>
+        SCOPE_ID,<br/>
+        SOLUTION_NAME,<br/>
+        SOLUTION_SHORT_NAME,<br/>
+        SOLUTION_DESC,<br/>
+        SOLUTION_OWNER,<br/>
+        OWNER_EMAIL,<br/>
+        SOLUTION_START,<br/>
+        CREATE_USER,<br/>
+        CREATE_TIME<br/>
+    )<br/>
+    </span><span style="color: rgb(0, 0, 255);">VALUES</span><span style="color: rgb(0, 0, 0);"><br/>
+    (<br/>
+        </span><span style="color: rgb(0, 128, 0);">@BUSINESS_SCOPE_ID</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">COMMON_BI</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">COMBI</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">ETL log framework record the execution information and error message for SSIS packages</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">BIWORK</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">biwork@126.com</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 255);">GETDATE</span><span style="color: rgb(0, 0, 0);">(),<br/>
+        </span><span style="color: rgb(255, 0, 255);">SYSTEM_USER</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 255);">GETDATE</span><span style="color: rgb(0, 0, 0);">()<br/>
+    )<br/>
+</span><span style="color: rgb(0, 0, 255);">END</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(0, 128, 0);">@SOLUTION_ID</span> <span style="color: rgb(128, 128, 128);">=</span><span style="color: rgb(0, 0, 0);"> SOLUTION_ID<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION <br/>
+</span><span style="color: rgb(0, 0, 255);">WHERE</span> SOLUTION_NAME <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">COMMON_BI</span><span style="color: rgb(255, 0, 0);">'</span><br/>
+<br/>
+<span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Set the SOLUTION ETL ID</span><br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(128, 128, 128);">EXISTS</span><span style="color: rgb(0, 0, 0);"> (<br/>
+                 </span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> ETL_ID<br/>
+                 </span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION_ETL <br/>
+                 </span><span style="color: rgb(0, 0, 255);">WHERE</span> ETL_NAME <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">ETL_TEMPLATE</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);"><br/>
+              )<br/>
+</span><span style="color: rgb(0, 0, 255);">BEGIN</span><br/>
+    <span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION_ETL<br/>
+    (<br/>
+        SOLUTION_ID,<br/>
+        FLOW_TYPE_ID,<br/>
+        ETL_NAME,<br/>
+        ETL_PACKAGE_NAME,<br/>
+        ETL_DESC,<br/>
+        ETL_FST_OWNER,<br/>
+        ETL_FST_OWNER_EMAIL,<br/>
+        ETL_SEC_OWNER,<br/>
+        ETL_SEC_OWNER_EMAIL,<br/>
+        CREATE_USER,<br/>
+        CREATE_TIME<br/>
+    )<br/>
+    </span><span style="color: rgb(0, 0, 255);">VALUES</span><span style="color: rgb(0, 0, 0);"><br/>
+    (<br/>
+        </span><span style="color: rgb(0, 128, 0);">@SOLUTION_ID</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(128, 0, 0); font-weight: bold;">20</span>, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Flow type is common data transformation</span><br/>
+        <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">ETL_TEMPLATE</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> SSIS Package naming rule  [SCOPE_SHORT_NAME]_[SOLUTION_SHORT_NAME]_[FLOW_TYPE]_[ETL_NAME]</span><br/>
+        <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">COMMON_COMBI_TRANS_ETL_TEMPLATE</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">ETL log template package</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">BIWORK</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">biwork@126.com</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 255);">SYSTEM_USER</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 255);">GETDATE</span><span style="color: rgb(0, 0, 0);">()<br/>
+    )<br/>
+</span><span style="color: rgb(0, 0, 255);">END</span></span></code></pre><p>有了这些信息，我们就可以开始设计和开发我们的 SSIS Package 了。</p><p><img alt="" height="385" src="http://images.cnitblog.com/blog/477275/201402/182223082584320.png" width="967"/></p><p>解决方案名称可以使用 Business Scope 的名称 COMMON_BIWORK_LOG，项目名称就叫做 COMMON_BI。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182231417155716.png"/></p><p>ETL 名称就是 COMMON_COMBI_TRANS_ETL_TEMPLATE。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182232136483739.png"/></p><p>先在包级别定义好这些变量并赋予一定的值，后面我会详细解释到它们各自的用途。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182323243729693.png"/></p><p>在 Control Flow 中创建这两个 Execute SQL Task (EST) - EST_INSERT_START_LOG</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182240020582374.png"/></p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182242020602035.png"/></p><p>EST_UPDATE_END_LOG</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182245404859396.png"/></p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182245503384076.png"/></p><p>保存并运行 SSIS Package ，并可以到 Process Log 表中查看结果。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182249388936431.png"/></p><p>前两条是之前我自己测试的日志，第三条可以看到它的日志信息，最主要的就是 START TIME，FINISH TIME 以及 EXECUTE STATUS，1 表示执行成功。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182249449097235.png"/></p><p>还有错误处理，对于错误的处理应该在 SSIS Package 的 Event Handler 中来完成，并且选择的是 OnError。 OnError 将捕获所有出错的事件，那么我们就会做两件事情。第一件就是在 PROCESS_LOG 中将对应的 PROCESS 状态从 0 改成 - 1，即表示失败。第二件事情即写入错误消息到错误日志中。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182254297878033.png"/></p><p>EST_UPDATE_END_LOG</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182304548572898.png"/> </p><p> EST_INSERT_ERROR_LOG</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182305027992789.png"/></p><p> <img alt="" src="http://images.cnitblog.com/blog/477275/201402/182259426837894.png"/></p><p>在控制流中添加一个错误的 Execute SQL Task来测试一下 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182311507406250.png"/></p><p>保存并执行 PACKAGE，出现错误并被 ON ERROR 捕获。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182312322697638.png"/></p><p>Event Handlers 中的 OnError 事件。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182312544254240.png"/></p><p>查看数据库中的日志和错误记录。</p><p><img alt="" height="247" src="http://images.cnitblog.com/blog/477275/201402/182313133445955.png" width="933"/></p><p>那么这样的一个小型日志框架就算搭建起来了，之后所有的 SSIS Package 都可以使用到这套框架。执行 SSIS Package 时，所有的日志，错误日志都会集中写到同一个 Log System 中。这套日志系统虽然看起来功能很简单，但是能够实实在在的支持上百个 ETL Package 的日志管理。不会出现 100 个 Package 有 100 套不同日志表的情况，极大的改善了我们维护，监控和管理 ETL 的过程。</p><p>同时，基于这个框架之上来开发我们的其它 Task 组件，每次出错的时候不需要再次打开 Execution Results 去找 Error Information。倘若一个 Package 有几十个 Task，这个执行的记录将会非常长，查错误很麻烦。而现在只需要去查询一下 Error Log 就可以了，可以非常快的找到在哪个 Component 出现的什么错误。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182320047405303.png"/></p><h2 id="articleHeader7">五. SSIS Package 配置管理在日志系统中的集成</h2><p>还记得前面的几个变量吗？</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182326033975542.png"/></p><p><strong>PC - Package Configuration</strong> - 也就是说这是 Package 配置级别的，会在 Package 配置中完成。</p><p><strong>PE - Package Environment</strong> - Package 在系统环境中的配置。</p><p><strong>PV - Package Variable</strong> - 无需配置，只是在 ETL Package 执行过程中使用到。</p><p>比较常见的 SSIS Package Configuration 往往会选择 XML Configuration File 来完成。当然现在在 SQL Server 2012 版本 BIDS 工具里已经不需要任何的 XML Configuration File 就可以完成配置了，非常容易。但是，在 JOB 的配置过程中还是需要提供配置的值。而我希望的是，所有的配置都能够集中在一张数据表中完成，也就是即使以后有几十个，上百个 SSIS Package 它们的配置也都集中在一张表中完成的。不需要 XML 配置文件，不需要在 JOB 定义 Package 时配置任何参数 - 一旦发布，在外无参数配置！首先，在这里要搞清楚一个概念 - BIWORKLOG 是核心日志数据库，这个数据库部署的位置先要确定好，应该部署在 JOB 运行时的 SERVER。在系统环境变量中定义好 COMMON BIWORKLOG 数据库所在 SERVER 的名称，数据库的名称。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182337515317482.png"/></p><p>添加一个环境变量配置，选中 COMMON_ETL_LOG_SERVER</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182340547989303.png"/></p><p>将这个环境变量的值赋值于 PE_COMMON_SERVER_NAME, 注意红色框内的值明显是我赋值错了，在环境变量中它的值是 LOCALHOST。 那什么时候 PE_COMMON_SERVER_NAME 将获取环境变量的值呢？ - 在 SSIS Package 运行的时候。当 SSIS Package 运行的时候，包配置将首先完成包配置中各个值的装配，此时的 PE_COMMON_SERVER_NAME 将接受系统环境变量 COMMON_ETL_LOG_SERVER 的值即 LOCALHOST。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182341049614013.png"/></p><p>同样的道理，配置 PE_COMMON_DATABASE_NAME。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182341108617545.png"/></p><p>这是这两个配置好的系统环境变量。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182341190265208.png"/></p><p>配置好了这两个系统环境变量之后，我们再来更改 Connection Manager 下的 CM_DB_BIWORK 的 Expression。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182348079674842.png"/></p><p>这样一来，在 SSIS Package 运行的时候，两个 PE 变量将读取系统环境变量的值，然后将两个系统环境变量的值成功配置到了 BIWORLOG 日志数据库的连接源了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182348163537804.png"/></p><p>第一个配置就算完成了！记得，在完成下面操作的时候一定要重启一下电脑，因为环境变量的配置有时需要重启之后才能生效！</p><p>再来看 PC_SOLUTION_ETL_ID 是怎么回事？</p><p>每次往 PROCESS_LOG 插入日志的时候就需要提供是哪个 ETL 运行的标志，我们应该这样来获取 SOLUTION_ETL_ID。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182352121388137.png"/></p><p>包括以后，如果我们要使用到另外的数据源，比如数据库连接对象等等如何配置呢？ 像这些配置选项也可以集中配置在一张表中来进行管理。</p><p>仍然打开 Package Configuration，然后在 Configuration Type 中选择 SQL Server。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182354086953980.png"/></p><p>Configuration Table 这时选择 NEW , 它将自动提供创建 SQL Server 配置表的代码，可以修改一下表名称。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/182356247293639.png"/></p><p>看到这个界面就知道这个表已经在 CM_DB_BIWORKLOG 连接管理器中所表示的 BIWORKLOG 数据库中准备创建了。</p><p>那么以后所有的包配置信息都可以配置在这一张表中，通过什么区分是哪一个包的配置呢？ 通过 COMMON_COMBI_TRANS_ETL_TEMPLATE 这个包的名称来区分，这个值是需要手工写上去的。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/190005150384218.png"/></p><p>选择将 PC_SOLUTION_ETL_ID 的 Value 给配置到 SQL Server 表中，这时需要注意良好的命名规范可以让你快速的知道哪些值是需要被配置的。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/190007333982022.png"/></p><p>保存这个配置。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/190008337817166.png"/></p><p>查看数据库中的配置，这里只有一个 Configuration Filter，以后每来一个 SSIS Package 就会在这里出现一个 Configuration Filter，配置上百个甚至上千个 ETL 包完全没有问题。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/190008498263936.png"/></p><p>如果需要更新某一个具体的值的话，需要 Update 就应该这样来更新，再次强调 - BIWORKLOG 日志系统的读写权限一定是非常非常高的。</p><pre><code><span style="font-family: Microsoft YaHei;"><span style="color: rgb(0, 0, 255);">UPDATE</span> <span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);">dbo</span><span style="color: rgb(255, 0, 0);">]</span>.<span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);">SSIS CONFIGURATIONS</span><span style="color: rgb(255, 0, 0);">]</span><br/>
+<span style="color: rgb(0, 0, 255);">SET</span> ConfiguredValue <span style="color: rgb(128, 128, 128);">=</span><span style="color: rgb(0, 0, 0);"> (<br/>
+                        </span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> ETL_ID <br/>
+                        </span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION_ETL <br/>
+                        </span><span style="color: rgb(0, 0, 255);">WHERE</span> ETL_PACKAGE_NAME <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">COMMON_COMBI_TRANS_ETL_TEMPLATE</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);"><br/>
+                      )<br/>
+</span><span style="color: rgb(0, 0, 255);">WHERE</span> ConfigurationFilter <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">COMMON_COMBI_TRANS_ETL_TEMPLATE</span><span style="color: rgb(255, 0, 0);">'</span><br/>
+<span style="color: rgb(128, 128, 128);">AND</span> PackagePath <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">\Package.Variables[User::PC_SOLUTION_ETL_ID].Properties[Value]</span><span style="color: rgb(255, 0, 0);">'</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span> <span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);">dbo</span><span style="color: rgb(255, 0, 0);">]</span>.<span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);">SSIS CONFIGURATIONS</span><span style="color: rgb(255, 0, 0);">]</span> </span></code></pre><p>再次回顾我们所有的配置过程 -</p><p>PE 和 PC 在这里的值都是不起到任何作用的。</p><p>PE 的值来自于系统环境变量，BIWORKLOG 数据库的 SERVER 地址和 DATABASE NAME 都是由这两个 PE 来赋值的。</p><p>PC 的值来自于 BIWORKLOG 中的 SSIS CONFIGURATIONS 表，PC_SOLUTION_ETL_ID 在插入日志和更新日志的时候会反复用到，它标识了当前 ETL 的ID。</p><p>也就是说没有 PE 就不会有 BIWORKLOG 的成功连接，没有 BIWORKLOG 就不会有 PC 在数据库中的配置，没有 PC 就不会有 Log 日志的插入。</p><p>这个配置链一定要理解清楚，我们所有的配置值就存在两个地方，一个是系统环境变量，这个值需要配置一次以后就不用配了。</p><p>以后所有 Package 级别的变量配置就都有 SSIS CONFIGURATIONS 表来维护，通过 Configuration Filter 来过滤。</p><p>这就是这套日志框架为什么可以支持成百上千个 SSIS 日志和包配置的原因。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/190014039883513.png"/></p><p>配置完毕后，再次运行 Package ，这时所有变量的值都不是在定义它们时候的值了，而是真正读取于环境变量和 SSIS CONFIGURATIONS 表。</p><h2 id="articleHeader8">六. SSIS Package 模板开发</h2><p>其实在我的这篇文章 - <a href="http://www.flybi.net/blog/biwork/588"><u><font color="#0066cc">SSIS 系列 - 利用 SSIS 模板快速开发 SSIS Package</font></u></a> 中已经提到了如何使用 SSIS Package 模板快速开发。</p><p>下面就使用上面的模板来演示实际运用，并在模板基础之上来完成一个 SSIS Pakcage 的开发。</p><p>找到我们上面创建的 Package。</p><p> <img alt="" src="http://images.cnitblog.com/blog/477275/201402/190024003353171.png"/></p><p>我使用的是 Windows Server 2008 R2 操作系统，安装的是 SQL Server 2008 R2 数据库，默认的环境应该是 -</p><p>C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE\PrivateAssemblies\ProjectItems\DataTransformationProject\DataTransformationItems</p><p>把包拷贝到这里。其它环境请参考 - <a href="http://www.flybi.net/blog/biwork/588"><u><font color="#0066cc">SSIS 系列 - 利用 SSIS 模板快速开发 SSIS Package</font></u></a></p><p><u><font color="#0066cc"><img alt="" src="http://images.cnitblog.com/blog/477275/201402/190027318453586.png"/></font></u></p><p>重启一下 BIDS 开发工具，然后就可以使用这个模板了，我将使用这个模板开发一个小 SSIS Package。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/190029382258093.png"/></p><p>一定要注意，是选择项目名称右键添加 - New Item，看到了这个模板了吗？</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/190030468222687.png"/></p><p>不要着急填写名称，而应该参照下面规范代码 -</p><p>由于这个 SSIS Package 和 COMMON_COMBI_TRANS_ETL_TEMPLATE 属于同一个 SOLUTION，所以 SOLUTION 是已知的 1，因此：</p><pre><code><span style="font-family: Microsoft YaHei;"><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Set the SOLUTION ETL ID</span><br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(128, 128, 128);">EXISTS</span><span style="color: rgb(0, 0, 0);"> (<br/>
+                 </span><span style="color: rgb(0, 0, 255);">SELECT</span><span style="color: rgb(0, 0, 0);"> ETL_ID<br/>
+                 </span><span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION_ETL <br/>
+                 </span><span style="color: rgb(0, 0, 255);">WHERE</span> ETL_NAME <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">ETL_TEMPLATE_TEST</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);"><br/>
+              )<br/>
+</span><span style="color: rgb(0, 0, 255);">BEGIN</span><br/>
+    <span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">INTO</span><span style="color: rgb(0, 0, 0);"> dbo.SOLUTION_ETL<br/>
+    (<br/>
+        SOLUTION_ID,<br/>
+        FLOW_TYPE_ID,<br/>
+        ETL_NAME,<br/>
+        ETL_PACKAGE_NAME,<br/>
+        ETL_DESC,<br/>
+        ETL_FST_OWNER,<br/>
+        ETL_FST_OWNER_EMAIL,<br/>
+        ETL_SEC_OWNER,<br/>
+        ETL_SEC_OWNER_EMAIL,<br/>
+        CREATE_USER,<br/>
+        CREATE_TIME<br/>
+    )<br/>
+    </span><span style="color: rgb(0, 0, 255);">VALUES</span><span style="color: rgb(0, 0, 0);"><br/>
+    (<br/>
+        </span><span style="color: rgb(128, 0, 0); font-weight: bold;">1</span>, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> SOLUTION ID</span><br/>
+        <span style="color: rgb(128, 0, 0); font-weight: bold;">20</span>, <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Flow type is common data transformation</span><br/>
+        <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">ETL_TEMPLATE_TEST</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> SSIS Package naming rule  [SCOPE_SHORT_NAME]_[SOLUTION_SHORT_NAME]_[FLOW_TYPE]_[ETL_NAME]</span><br/>
+        <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">COMMON_COMBI_TRANS_ETL_TEMPLATE_TEST</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">ETL log template package</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">BIWORK</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">biwork@126.com</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 255);">SYSTEM_USER</span><span style="color: rgb(0, 0, 0);">,<br/>
+        </span><span style="color: rgb(255, 0, 255);">GETDATE</span><span style="color: rgb(0, 0, 0);">()<br/>
+    )<br/>
+</span><span style="color: rgb(0, 0, 255);">END</span></span></code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/190034577037630.png"/></p><p>按照这个名称创建包，但注意不要急着运行。因为很显然，PC_SOLUTION_ID 在上面显示的为 2，并且在 SSIS CONFIGURATIONS 表中的 Configuration Filter 也不一样。</p><p>先将 PC_SOLUTION_ETL_ID 的值设置为2，这样一会修改 Package Configuration 的时候，在第一次创建新的 Configuration Filter 的时候就会将这个值写到数据库中。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/190038151749390.png"/></p><p>修改 Package SQLSERVER CONFIG, 这里的 Configuration Filter 将改成新的包名 COMMON_COMBI_TRANS_ETL_TEMPLATE_TEST 。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/190040539577466.png"/></p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/190041541658096.png"/></p><p>保存后查看数据库表 SSIS CONFIGURATIONS，这个配置就完成了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201402/190042523973084.png"/></p><p>如果后面还需要任何的变量配置，都可以通过这种方式集中配置在这张表中，这样我们的变量就不需要配置到 XML 文件中，一来是不方便检查配置的内容，二来当 ETL 数量增多的时候， XML 配置文件的管理和配置稍不注意也容易出现混乱。</p><h2 id="articleHeader9">七. 日志系统的报表开发</h2><p> <img alt="" src="http://images.cnitblog.com/blog/477275/201402/190048438312116.png"/></p><p>有了上面的这些表对象和日志记录，其实很容易开发出一些常用的日志报表，并且自定义的功能更完善更细致。</p><p>下面我随便写两两张报表，但是实际上可做的报表，实用的报表很多。</p><p><img alt="" height="513" src="http://images.cnitblog.com/blog/477275/201402/190057416147445.png" width="935"/></p><p><img alt="" height="125" src="http://images.cnitblog.com/blog/477275/201402/190057592556500.png" width="965"/></p><p>如果再回头看看文本开头时的几个问题的话，我们是不是完全开发一些报表来回答？</p><ol><li>首先，在这里提出几个问题，可以试着回答一下？</li><li>假设我们项目中，一个项目中最终上线的 ETL 包多达上百个，如何对这些包进行统一的日志管理 ？</li><li>现在在线运行的 ETL 包有多少个？ 多长时间？ 哪些包的运行时间最长，哪些最少 ？ 项目经理需要一份图表能够反映出这些 KPI 来。</li><li>每天运行的 ETL 包有多少个？ 测试环境，开发环境上都跑了多少个 ?</li><li>如何快速查询每个包运行的状态，成功否，失败否，失败的原因等等 ？</li><li>每个包都有一个配置文件，几百个包的配置文件又是如何进行管理的 ？ 这些配置文件中都有些什么内容 ？现在配置的参数都各自是什么？</li><li>这些包各自大概属于哪些部门使用的？业务范围是什么？ 这些包失败了找谁？ 谁开发的？</li><li>哪些包是用来加载文件，输出文件的，哪些包只是用来一般的数据转换的 ？ 输入文件在哪里 ？ 输出文件在哪里 ？</li><li>随便给出一个 SSIS Package 的名称，你知道它大概是做什么的吗？</li><li>每周的项目会议中，考虑过没有拿出上面的这些答案，数据，图表来对付各个老大们的提问 ？</li><li>.........</li></ol><hr/><p>实际上基于上面的日志系统还有很多东西可以做，特别是 AUDITING 的内容可以扩展的非常丰富。这一部分可以集成到上述的 Log System 中，比如记录文件的输入，输出位置，导入导出的记录条数；表记录的增长条数，修改条数等等，这一切都可以集成起来配置 Log System 来使用。</p><p>Logging System + Auditing System 构成一个完整的维护和管理 ETL 包的运行记录的框架体系，对于我们开发，测试，以及线上的维护，调优等工作都是非常非常重要的。</p><p>关于 Auditing 的部分下次再慢慢写。</p><h2 id="articleHeader10">注意的地方</h2><p>1. 最后一定要强调，COMMON BIWORK LOG 一定要控制好权限，只能允许少数人对核心配置表进行修改，他人只能进行查询，并同时应做好备份工作。 </p><p>2. 系统环境变量的配置会要求服务器重启，这个在很多已上线的环境可能很难做到，因此可以灵活改变。 在 SQL Server 2008 环境下，可以使用 XML Package Configuration。在 2010 、2012 开发环境下，可以使用 Package Parameter 来进行配置，也非常方便和灵活。</p><p>3. 不支持子父 Package，如果需要支持子父 Package 的调用，可以自行修改表结构，在 PROCESS_LOG 中加上一列 PARENT_LOG_ID 然后再修改相应的存储过程。</p><h2 id="articleHeader11">总结</h2><p>这篇文章一字一字敲从晚上8点敲到现在将近 6 个钟头，我相信我已经尽量做到把一些关键点交待清楚，相信只要认真看下来是非常容易理解的。</p><p>如果跟着这篇文章做下来，超不过30分钟就可以搭建一个小的 BIWORKLOG 框架，可以根据实际项目需要大家自行扩展和丰富功能。</p><p>关于能不能统一管理上百个的 ETL的日志系统 ，我可以肯定的回答：没有问题，因为它本身只是用来记录日志的地方。并且统一管理的好处就是自上而下规范了所有 ETL 的设计，包括命名规范和包配置。我见过有上百个 SSIS Package 三年以来还管理很好的 ETL 项目，也见过只有几十个 ETL 但日志，配置非常混乱的项目。</p><p>希望这套小框架对大家有所帮助！欢迎多多交流！</p>
+</div>]
+</body>
+</html>

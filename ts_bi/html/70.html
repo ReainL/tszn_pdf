@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>经常有像类似于这样的排序需求，以及设置分组下的排序序号。比如此图中要求城市 City 在省份下按照 Internet Sales Amount 总销售额进行排序，并标识在各省份下的排名。</p><p><img alt="" src="http://images.cnitblog.com/blog2015/477275/201504/081051341965399.png"/></p><h2 id="articleHeader2">实现过程</h2><p>先把分组做好，然后添加新的一列 Rank。</p><p><img alt="" src="http://images.cnitblog.com/blog2015/477275/201504/081051539771958.png"/></p><p>在 City 分组的 Group Properties 中，它的排序是按照 SUM 聚合 Internet Sales Amount 来排序的。</p><p><img alt="" src="http://images.cnitblog.com/blog2015/477275/201504/081052138835542.png"/></p><p>在 Rank 位于 City 一行的表达式中使用 RunningValue 函数。</p><p><img alt="" src="http://images.cnitblog.com/blog2015/477275/201504/081052338994328.png"/></p><p>下面表达式的作用是在指定的 StateProvince 组下，计算去重之后 City 的数量，那么第一行就是 1，第二行累加就变成 1 1 = 2 了，这样就实现了排序 RANK NO。</p><p><img alt="" src="http://images.cnitblog.com/blog2015/477275/201504/081052523219698.png"/></p><p>关于 RunningValue 函数的使用可以参考：<a href="https://msdn.microsoft.com/zh-cn/library/dd255229.aspx">https://msdn.microsoft.com/zh-cn/library/dd255229.aspx</a></p><p>返回在给定作用域中计算的、由表达式指定的所有非 Null 数值的运行聚合。RunningValue(expression, function, scope)</p><p>在本示例中，可以将 Scope 变成 Nothing, 或者 Country 来看看不同作用域下 RunningValue 的变化情况。</p>
+</div>]
+</body>
+</html>

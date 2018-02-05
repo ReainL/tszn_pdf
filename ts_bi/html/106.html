@@ -1,0 +1,84 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">Performing Advanced Set Construction</h2><h2 id="articleHeader2">Assembling Sets with the Generate Function</h2><p>如果你对C#或者VB 等其它变成语言熟悉的话，应该对循环比较熟悉。在循环中，可以遍历集合里的每一个对象，在遍历的时候，对对象会执行一些操作。换一种方式来看MDX  SET中的元组就如同看集合中的对象，使用 SET集合的一些表达式来执行一些操作，对 Generate 函数来说这个可能就是对它的一个初步概念和认识。</p><p>Generate ({Set}, {Set Expression} [, ALL])</p><p>在Generate 函数中迭代的 SET 集合中的每一个元组，都会参与到一个基于 SET 集合的表达式中计算。每一次迭代返回的一个集合都会和其它迭代后产生的集合连接起来重新组成一个新的集合并返回，ALL 关键字的作用就是定义是否需要保留重复的元组。</p><p>使用Generate 函数的机会不是非常的多，但是如果碰到需要循环迭代的逻辑，这时就需要考虑是否需要使用Generate 来解决一些问题。</p><h3 id="articleHeader3">示例一 - 先看一个简单的查询 Reseller Sales 销售前5的产品</h3><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+TopCount(<br/>
+　　　　　　{[Product].[Product].[Product].Members},<br/>
+　　　　　　5,<br/>
+　　　　　　([Measures].[Reseller Sales Amount])<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/28172826-1c57ec00f4ad4d1c9c19ac0e2f45b2ac.png"/></p><p>这个示例在之前的章节中一直在使用，观察一下这个查询返回的都是自行车，当然事先并不知道返回的一定就是自行车。如果我们想查询每个产品分类下前5名销售的产品，可以使用 Generate 函数。</p><h3 id="articleHeader4">示例二</h3><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Generate(<br/>
+　　　　　　{[Product].[Category].[Category].Members},<br/>
+　　　　　　TopCount(<br/>
+　　　　　　　　{[Product].[Product].[Product].Members},<br/>
+　　　　　　　　5,<br/>
+　　　　　　　　([Measures].[Reseller Sales Amount])<br/>
+　　　　)<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/28173050-d1118366e0184b33a2e95abd832cd6cc.png"/></p><p>这次查询的结果如上图所示和之前查询的结果完全一样，如何解释这个问题？ 我们加上 ALL 关键字。</p><h3 id="articleHeader5">示例三 – 带 ALL 的 Generate 函数</h3><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Generate(<br/>
+　　{[Product].[Category].[Category].Members},<br/>
+　　TopCount(<br/>
+　　　　{[Product].[Product].[Product].Members},<br/>
+　　　　5,<br/>
+　　　　([Measures].[Reseller Sales Amount])<br/>
+　　),<br/>
+　　ALL<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/28173150-f0335c8f46e144178692615dd8d7646d.png"/></p><p>这个查询结果应该是一个包含有20个产品的集合，因为首先我们的产品分类有四种，我们可以看到Generate 函数的第一个参数是一个集合{[Product].[Category].[Category].Members} 有四个成员。</p><p>四个成员就意味着有四轮循环，每一轮循环中经过 TopCount 函数会返回5个产品信息，那么总共有20个成员的集合返回。由于在 TopCount 函数中取销售最多的前5名产品的过程中，没有使用到 Category 这个上下文环境，那么这样就造成了每个迭代过程中取销售前5名的范围都是在所有产品中取。这样循环4次每次取到的结果都是一样，我们使用 ALL 关键字就看得出来这几次循环取的产品是一样的。因为在上一个示例中，在 Generate 函数中并没有使用 All 函数，因此重复的元组被自动的剔出掉， 所以最终的结果是只返回了5个产品。</p><p>为了解决这个问题，我们应该记得在 MDX Step by Step 读书笔记(五) - Working with Expressions (MDX 表达式) - CurrentMember - Properties - Existing 的使用 中讲解了 Existing 关键字的作用，它可以强制当前集合关联到上下文环境。在这个例子中，什么是上下文环境？Category 就是上下文环境，要求在每个Category的上下文环境(可以理解为查询范围)中来查询前5的产品。</p><h3 id="articleHeader6">示例四 – 在 Generate 函数中使用 Existing 上下文环境的应用</h3><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Generate(<br/>
+　　{[Product].[Category].[Category].Members},<br/>
+　  TopCount(<br/>
+　　　　　　　　EXISTING {[Product].[Product].[Product].Members},<br/>
+　　　　　　　　5,<br/>
+　　　　　　　　([Measures].[Reseller Sales Amount])<br/>
+　　　　　　),<br/>
+　　 ALL<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/28173317-9894366cba3148f1b3cfee500f3b33e1.png"/></p><p>这样就查询出来了，但是查询结果看得有点费劲，因此再改一改。</p><h3 id="articleHeader7">示例五 – 使用 Existing 的 Generate 函数</h3><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Generate(<br/>
+                {[Product].[Category].[Category].Members},<br/>
+                {[Product].[Category].CurrentMember}*<br/>
+                TopCount(<br/>
+                    EXISTING {[Product].[Product].[Product].Members},<br/>
+                    5,<br/>
+                    ([Measures].[Reseller Sales Amount])<br/>
+            ),<br/>
+    ALL<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/28173429-660a0b5b34444b6bb1fec1bab3d10a74.png"/></p><p>这样就可以看到它们各自的分类以及分类下前5的产品。</p><h2 id="articleHeader8">Assembling Sets with the Extract Function</h2><p>Extract 函数的主要作用就是从一个集合中根据其它的层次结构来抽取元组并形成一个新的集合。</p><p>Extract ({Set}, Hierarchy1 [, Hierarchy2, .. HierarchyN])</p><p>第一个参数是一个集合，第二个参数以后都是属性层次结构。相当于比如集合中的元组由 Product 和 Calendar 这两个成员组成，假设第二个参数是 Product 层次结构，那么最后的结构就是将集合中与 Product 层次结构关联的那部分元组(即Product成员)取出，而 Calendar 成员将被排除在返回的集合中。这个操作与 CrossJoin 的操作正好相反，CrossJoin 是两组集合相结合，而 Extract是按照提供的层次结构对集合进行分解。</p><h3 id="articleHeader9">示例一 – 先看使用 * 或者 CrossJoin 的示例</h3><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+{[Product].[Product].[Product].Members} *<br/>
+{[Date].[Calendar].[Month].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/28173524-6d6e962aa0b342ff82d9108fb28d727b.png"/></p><p>在这个查询中，可以看到月份和产品结合后 Reseller Sales 的情况。这个查询的数据量可能有点多，那么我们可能更希望关注那些卖的比较不错的产品，比如查询那些大于 16000 的产品。</p><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Filter(<br/>
+    {[Product].[Product].[Product].Members} *<br/>
+    {[Date].[Calendar].[Month].Members},<br/>
+    ([Measures].[Reseller Sales Amount])&gt;160000<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/28173557-c6b6fa9eba0c4e269de0bd6ba18d7f31.png"/></p><p>这下可以看清楚一些，行中有两列组成，一列是来源于{[Product].[Product].[Product].Members} 一列来源于{[Date].[Calendar].[Month].Members} 它们通过 CrossJoin 关联起来。那么如果我们在这里只想看到 Product 或者 Date 方面的内容，那么就需要对这个查询结果进行拆分。</p><h3 id="articleHeader10">示例二 – 使用 Extract 根据层次结构分拆集合</h3><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+Extract(<br/>
+Filter(<br/>
+    {[Product].[Product].[Product].Members} *<br/>
+    {[Date].[Calendar].[Month].Members},<br/>
+    ([Measures].[Reseller Sales Amount])&gt;160000<br/>
+),<br/>
+[Product].[Product]<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/28173656-c413d8d1c44c40479c32022cec4271e6.png"/></p><p>对比上一个例子，抽取出来的部分只有产品部分内容，并且它们是唯一的。因为对比上一个示例，一个产品在多个月份都有数据，现在只提取产品部分，那么它们的数据将自动合并累加到一个唯一的产品了。</p>
+</div>]
+</body>
+</html>

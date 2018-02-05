@@ -1,0 +1,116 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>大多数情况下我们的 SSIS 包都会配置在 SQL Agent Job 中周期性的按计划执行，比如每天晚上调用 SSIS 包刷新数据，处理 Cube 等。一旦 SSIS 包中出现任何异常，报错，那么配置在 SQL Agent Job 中的通知，邮件提醒就会把这些错误信息发邮件到指定的用户或者系统维护者，这样就起到了一个错误监控的作用。</p><p>但是在有的情况下，有一些自定义的 SSIS 调度框架的计划调度都不是通过 SQL Agent Job 配置来完成的。比如我以前在一个小项目中设计过一个 SSIS 调度框架，只有一个主包配置在 SQL Agent Job 中，所有子包的上线不由 SQL Agent Job 支配。每次新增的子包要上线，只需要将相应的信息以及调度计划注册到相应的表中即可，不需要打开 SQL Agent Job 调整各个子包的执行顺序等等。那么在这种情况下，就只能在 SSIS 内部使用发送邮件的功能来发送错误信息，因为所有的子包和 SQL Agent Job 都是没有直接关系的。</p><p>在 SSIS 中我们可以通过 Send Mail Task 或者 Script Task 来发送邮件，当然还有第三种方式就是写存储过程调用发送邮件存储过程.</p><h2 id="articleHeader2">Send Mail Task 发送邮件</h2><p>Send Mail Task 的使用其实非常的简单，配置的步骤也并不多，但是在使用它的时候有几个限制：</p><ol><li>只能发送普通的文本格式的邮件，也就是说不支持 HTML 格式的邮件。</li><li>连接 SMTP Server 时不支持用户填写用户名和密码，也就是说用户要么在域环境下 SMTP Server 对用户进行 Windows 方式验证，要么就是访问的 SMTP Server 支持匿名访问，不需要提供用户名和密码。</li><li>SMTP Server 的端口号使用默认的，也就是说如果在域中的 SMTP Server 端口号不是默认的话 Send Mail Task 就无法使用了。 </li></ol><p>这里是我常用的一个测试服务器地址 <a href="http://www.yopmail.com/en/"><u><font color="#0066cc">http://www.yopmail.com/en/</font></u></a> ，免费的并支持匿名访问，可以通过它来进行邮件发送的测试。关于 Send Mail Task 的使用方式就不在这里演示了，在非域和非 Windows 验证方式下用我提到的可匿名访问的 Yop Mail 一试便知，主要是讲 Script Task 发送邮件的方式。</p><h3 id="articleHeader3">Script Task 发送邮件</h3><p>新建一个包并首先创建一个 SMTP 连接 - New Connection。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201409/282157209203596.png"/></p><p>选择 SMTP 连接管理器。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201409/282157355923378.png"/></p><p>以我的邮箱为例子 BIWORK@126.com 发送邮箱服务器是 smtp.126.com，这个可以在<a href="http://help.163.com/09/0219/10/52GOPOND007536NI.html"><u><font color="#0066cc">网易邮箱配置页面</font></u></a>查到。但是非常遗憾！在这里仍然是没有地方可以配置用户名和密码的，默认的情况下仍然是只支持 Windows 验证或者匿名访问。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201409/282157589984396.png"/></p><p>所以说，如果想要在 SMTP Connection 里自己动手配置用户名和密码是不可能的，那么像这种 163,126等等很多很多邮箱直接通过 SMTP Connection 是肯定无法完成发送邮件操作的。</p><p>看下图时一定要理解一点：<span style="color: rgb(255, 0, 0);">几乎每一个 SSIS 控件的属性都是<strong>可配置</strong>的，也是<strong>可获取</strong>的，这是我们在 SSIS ETL 的学习过程中解决很多很多问题的最关键的地方！</span></p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201409/282202212958062.png"/></p><p>新建一些常用的变量，发件人，收件人，抄送，邮件标题，内容，附件地址，还有用户名和密码等。</p><p>PS：关于这个密码有一个故事，以前在公司里有一个管机房管电脑的同事，他的网络下载速度最快也没人管，他的电脑里有各种游戏，高清蓝光和 1024。每次大家伙要点东西像挤牙膏似的，大家都在想办法搞他的密码，直到后来大家有意无意记了并试出了密码 - 大概就是 lowformat1MBD!! 类似于这样的！看了密码之后我们都一致认为这个密码确实很符合他的职业，不过貌似苦大仇深啊！</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201409/291011309726527.png"/></p><p>其中 PV_CONTENT 变量描述的是邮件发送的 HTML 格式的内容，注意是字符串类型的因此需要双引号。</p><pre><code><span style="font-family: Microsoft YaHei;">"<span style="color: rgb(0, 0, 255);">&lt;</span><span style="color: rgb(128, 0, 0);">h1</span><span style="color: rgb(0, 0, 255);">&gt;</span>Hi BIWORK!<span style="color: rgb(0, 0, 255);">&lt;/</span><span style="color: rgb(128, 0, 0);">h1</span><span style="color: rgb(0, 0, 255);">&gt;</span><br/>
+<span style="color: rgb(0, 0, 255);">&lt;</span><span style="color: rgb(128, 0, 0);">p</span><span style="color: rgb(0, 0, 255);">&gt;</span><span style="color: rgb(0, 0, 0);"><br/>
+This is a test email from the test SSIS package of BIWORK!<br/>
+</span><span style="color: rgb(0, 0, 255);">&lt;/</span><span style="color: rgb(128, 0, 0);">p</span><span style="color: rgb(0, 0, 255);">&gt;</span><br/>
+<span style="color: rgb(0, 0, 255);">&lt;</span><span style="color: rgb(128, 0, 0);">p</span><span style="color: rgb(0, 0, 255);">&gt;</span>Server Name - "+ @[System::MachineName] +"<span style="color: rgb(0, 0, 255);">&lt;/</span><span style="color: rgb(128, 0, 0);">p</span><span style="color: rgb(0, 0, 255);">&gt;</span><br/>
+<span style="color: rgb(0, 0, 255);">&lt;</span><span style="color: rgb(128, 0, 0);">p</span><span style="color: rgb(0, 0, 255);">&gt;</span>Package Name - "+ @[System::PackageName] +"<span style="color: rgb(0, 0, 255);">&lt;/</span><span style="color: rgb(128, 0, 0);">p</span><span style="color: rgb(0, 0, 255);">&gt;</span><br/>
+<span style="color: rgb(0, 0, 255);">&lt;</span><span style="color: rgb(128, 0, 0);">p</span><span style="color: rgb(0, 0, 255);">&gt;</span>Package Start Time - "+ (DT_WSTR, 12) ( DT_DBDATE) @[System::StartTime] +"<span style="color: rgb(0, 0, 255);">&lt;/</span><span style="color: rgb(128, 0, 0);">p</span><span style="color: rgb(0, 0, 255);">&gt;</span><br/>
+<span style="color: rgb(0, 0, 255);">&lt;</span><span style="color: rgb(128, 0, 0);">p</span><span style="color: rgb(0, 0, 255);">&gt;&lt;/</span><span style="color: rgb(128, 0, 0);">br</span><span style="color: rgb(0, 0, 255);">&gt;</span>Thanks and Regards!<span style="color: rgb(0, 0, 255);">&lt;/</span><span style="color: rgb(128, 0, 0);">p</span><span style="color: rgb(0, 0, 255);">&gt;</span><br/>
+<span style="color: rgb(0, 0, 255);">&lt;</span><span style="color: rgb(128, 0, 0);">p</span><span style="color: rgb(0, 0, 255);">&gt;</span>Simon<span style="color: rgb(0, 0, 255);">&lt;/</span><span style="color: rgb(128, 0, 0);">p</span><span style="color: rgb(0, 0, 255);">&gt;</span>"</span></code></pre><p>系统变量的信息也通过表达式嵌入到邮件正文中。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201409/282211552956889.png"/></p><p>编辑 Script Task 并引入这些变量，Script Task 中的代码 - </p><pre><code><span style="font-family: Microsoft YaHei;"><span style="color: rgb(0, 0, 255);">using</span> System.Net.Mail; <span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> BIWORK Added</span><br/>
+<span style="color: rgb(0, 0, 255);">using</span> System.Text.RegularExpressions; <span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> BIWORK Added</span></span></code></pre><p>Main 中的代码包括处理优先级，多个收件人的处理，用户名和密码，添加附件的方式等等。</p><pre><code><span style="color: rgb(0, 0, 255);">public</span> <span style="color: rgb(0, 0, 255);">void</span><span style="color: rgb(0, 0, 0);"> Main()<br/>
+        {<br/>
+            </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> Default Priority and SMTP Server Port</span><br/>
+            <span style="color: rgb(0, 0, 255);">int</span> iPriority = <span style="color: rgb(128, 0, 128);">1</span><span style="color: rgb(0, 0, 0);">;<br/>
+            </span><span style="color: rgb(0, 0, 255);">int</span> smtpPort = <span style="color: rgb(128, 0, 128);">25</span><span style="color: rgb(0, 0, 0);">;<br/>
+             <br/>
+            </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);">User::PV_ATTACHED_FILE,User::PV_CONTENT,User::PV_MAIL_FROM,<br/>
+            </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);">User::PV_MAIL_TO,User::PV_MAIL_TO_CC,User::PV_TITLE</span><br/>
+            String mailFrom = Dts.Variables[<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">User::PV_MAIL_FROM</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">].Value.ToString();<br/>
+            String mailTo </span>= Dts.Variables[<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">User::PV_MAIL_TO</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">].Value.ToString();<br/>
+            String mailToCC </span>= Dts.Variables[<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">User::PV_MAIL_TO_CC</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">].Value.ToString();<br/>
+            String mailTitle </span>= Dts.Variables[<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">User::PV_TITLE</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">].Value.ToString();<br/>
+            String mailContent </span>= Dts.Variables[<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">User::PV_CONTENT</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">].Value.ToString();<br/>
+            String mailAttachedFilePath </span>= Dts.Variables[<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">User::PV_ATTACHED_FILE</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">].Value.ToString();<br/>
+            <br/>
+            </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> User Information</span><br/>
+            String loginUser = Dts.Variables[<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">User::PV_LOGIN_USER</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">].Value.ToString();<br/>
+            String loginPwd </span>= Dts.Variables[<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">User::PV_LOGIN_PWD</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">].Value.ToString();<br/>
+<br/>
+            </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> Get SMTP Server Information from Connection Manager</span><br/>
+            String smtpServer = Dts.Connections[<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">CM_SMTP_126</span><span style="color: rgb(128, 0, 0);">"</span>].Properties[<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">SmtpServer</span><span style="color: rgb(128, 0, 0);">"</span>].GetValue(Dts.Connections[<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">CM_SMTP_126</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">]).ToString();<br/>
+<br/>
+            </span><span style="color: rgb(0, 0, 255);">try</span><span style="color: rgb(0, 0, 0);"><br/>
+            {<br/>
+                SmtpClient smtpClient </span>= <span style="color: rgb(0, 0, 255);">new</span><span style="color: rgb(0, 0, 0);"> SmtpClient();<br/>
+                MailMessage message </span>= <span style="color: rgb(0, 0, 255);">new</span><span style="color: rgb(0, 0, 0);"> MailMessage(); <br/>
+                MailAddress fromAddress </span>= <span style="color: rgb(0, 0, 255);">new</span> MailAddress(mailFrom, <span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">BIWORKTEST</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">);<br/>
+<br/>
+                </span><span style="color: rgb(0, 0, 255);">string</span>[] sEmailTo = Regex.Split(mailTo, <span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">;</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">);<br/>
+                </span><span style="color: rgb(0, 0, 255);">string</span>[] sEmailToCC = Regex.Split(mailToCC, <span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">;</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">);<br/>
+<br/>
+                smtpClient.Host </span>=<span style="color: rgb(0, 0, 0);"> smtpServer;<br/>
+                smtpClient.Port </span>=<span style="color: rgb(0, 0, 0);"> smtpPort;<br/>
+<br/>
+                </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> Login information</span><br/>
+                System.Net.NetworkCredential myCredentials =<br/>
+                   <span style="color: rgb(0, 0, 255);">new</span><span style="color: rgb(0, 0, 0);"> System.Net.NetworkCredential(loginUser, loginPwd);<br/>
+                smtpClient.Credentials </span>=<span style="color: rgb(0, 0, 0);"> myCredentials;<br/>
+<br/>
+                </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> Attachment </span><br/>
+<span style="color: rgb(0, 0, 0);">                System.Net.Mail.Attachment attachment;<br/>
+                attachment </span>= <span style="color: rgb(0, 0, 255);">new</span><span style="color: rgb(0, 0, 0);"> System.Net.Mail.Attachment(mailAttachedFilePath);<br/>
+                message.Attachments.Add(attachment);<br/>
+                 <br/>
+                message.From </span>=<span style="color: rgb(0, 0, 0);"> fromAddress;  <br/>
+<br/>
+                </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> Multiple email to address</span><br/>
+                <span style="color: rgb(0, 0, 255);">if</span> (sEmailTo != <span style="color: rgb(0, 0, 255);">null</span><span style="color: rgb(0, 0, 0);">)<br/>
+                {<br/>
+                    </span><span style="color: rgb(0, 0, 255);">for</span> (<span style="color: rgb(0, 0, 255);">int</span> i = <span style="color: rgb(128, 0, 128);">0</span>; i &lt; sEmailTo.Length; ++<span style="color: rgb(0, 0, 0);">i)<br/>
+                    {<br/>
+                        </span><span style="color: rgb(0, 0, 255);">if</span> (sEmailTo[i] != <span style="color: rgb(0, 0, 255);">null</span> &amp;&amp; sEmailTo[i] != <span style="color: rgb(128, 0, 0);">""</span><span style="color: rgb(0, 0, 0);">)<br/>
+                        {<br/>
+                            message.To.Add(sEmailTo[i]);<br/>
+                        }<br/>
+                    }<br/>
+                }<br/>
+<br/>
+                </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> Multiple cc address</span><br/>
+                <span style="color: rgb(0, 0, 255);">if</span> (sEmailToCC != <span style="color: rgb(0, 0, 255);">null</span><span style="color: rgb(0, 0, 0);">)<br/>
+                {<br/>
+                    </span><span style="color: rgb(0, 0, 255);">for</span> (<span style="color: rgb(0, 0, 255);">int</span> i = <span style="color: rgb(128, 0, 128);">0</span>; i &lt; sEmailToCC.Length; ++<span style="color: rgb(0, 0, 0);">i)<br/>
+                    {<br/>
+                        </span><span style="color: rgb(0, 0, 255);">if</span> (sEmailToCC[i] != <span style="color: rgb(0, 0, 255);">null</span> &amp;&amp; sEmailToCC[i] != <span style="color: rgb(128, 0, 0);">""</span><span style="color: rgb(0, 0, 0);">)<br/>
+                        {<br/>
+                            message.To.Add(sEmailToCC[i]);<br/>
+                        }<br/>
+                    }<br/>
+                }<br/>
+<br/>
+                </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> Email priority</span><br/>
+                <span style="color: rgb(0, 0, 255);">switch</span><span style="color: rgb(0, 0, 0);"> (iPriority)<br/>
+                {<br/>
+                    </span><span style="color: rgb(0, 0, 255);">case</span> <span style="color: rgb(128, 0, 128);">1</span><span style="color: rgb(0, 0, 0);">:<br/>
+                        message.Priority </span>=<span style="color: rgb(0, 0, 0);"> MailPriority.High;<br/>
+                        </span><span style="color: rgb(0, 0, 255);">break</span><span style="color: rgb(0, 0, 0);">;<br/>
+                    </span><span style="color: rgb(0, 0, 255);">case</span> <span style="color: rgb(128, 0, 128);">3</span><span style="color: rgb(0, 0, 0);">:<br/>
+                        message.Priority </span>=<span style="color: rgb(0, 0, 0);"> MailPriority.Low;<br/>
+                        </span><span style="color: rgb(0, 0, 255);">break</span><span style="color: rgb(0, 0, 0);">;<br/>
+                    </span><span style="color: rgb(0, 0, 255);">default</span><span style="color: rgb(0, 0, 0);">:<br/>
+                        message.Priority </span>=<span style="color: rgb(0, 0, 0);"> MailPriority.Normal;<br/>
+                        </span><span style="color: rgb(0, 0, 255);">break</span><span style="color: rgb(0, 0, 0);">;<br/>
+                }<br/>
+<br/>
+                message.Subject </span>=<span style="color: rgb(0, 0, 0);"> mailTitle;<br/>
+                message.IsBodyHtml </span>= <span style="color: rgb(0, 0, 255);">true</span><span style="color: rgb(0, 0, 0);">;<br/>
+                message.Body </span>=<span style="color: rgb(0, 0, 0);"> mailContent;<br/>
+<br/>
+                smtpClient.Send(message);<br/>
+            }</span><span style="color: rgb(0, 0, 255);">catch</span><span style="color: rgb(0, 0, 0);"> (Exception ex)<br/>
+            {<br/>
+                Dts.TaskResult </span>= (<span style="color: rgb(0, 0, 255);">int</span><span style="color: rgb(0, 0, 0);">)ScriptResults.Failure;<br/>
+            }<br/>
+            </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> Close Script Task with success </span><br/>
+            Dts.TaskResult = (<span style="color: rgb(0, 0, 255);">int</span><span style="color: rgb(0, 0, 0);">)ScriptResults.Success; <br/>
+        }</span></code></pre><p>保存并执行 SSIS 包，执行成功！</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201409/282217024046545.png"/></p><p>优先级别，标题，发送人等信息 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201409/291013080198242.png"/></p><p>附件信息和内容都可以看的到，包括在抄送栏中抄送给了自己，Package Start Time 的时间是来自虚机的时间，我虚机的时间还是 28日，这个是正确的 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201409/291013315819073.png"/></p><h3 id="articleHeader4">总结</h3><p>从中可以看出，虽然在 SSIS 中提供了 SMTP 的连接方式，但是实际上它还是默认只允许通过 Windows 验证或者匿名访问的方式来访问。但是我们通过 Script Task 在 Script 中关联到了 SMTP 服务器，并同时写入用户名和密码，这样就实现了在 SSIS 中访问非域环境下第三方的 SMTP 服务器并通过身份验证且发送邮件的效果。</p><p>当然，这种方式在实际项目中可能用的并不是很多，因为项目中的邮件肯定是通过域验证的方式去访问更安全一些，毕竟系统信息的传递只能限制在域中。</p><p>在项目中使用邮件通知如是 Windows 验证的方式，有这几个点需要注意：</p><ol><li>在开发与测试过程中，手动执行 SSIS Package 的这个用户要有域中发送邮件的权限，能够通过 Windows 验证。</li><li>当包部署到 SQL Agent Job 中后，执行 SQL Agent Job 的账号要有域发送邮件的权限，也必须能通过 Windows 验证。</li><li>如果不需要部署到 SQL Agent Job，那么就直接使用 Send Mail Task 通过 Windows 验证也可以直接发送错误消息提醒。</li></ol><h3 id="articleHeader5">疑问</h3><p>在这个例子中的代码是不是一定要像这样去访问 SMTP Server 的连接信息，感觉是不是多此一举？ - 可以不用这样访问，其实很多 SMTP 的配置信息最为方便的是配置成变量，通过变量传递给 Script Task 就可以了。这里通过这样的一种方式来表示在 Script Task 中如何获取连接管理器的属性信息的，因为很多时候我们只知道如何去获取变量信息，这一点体现了 C# Script 的灵活性，我们在 Script 中可以做非常多的事情。包括这些访问 SMTP Server 如何使用 smtpClient 发送邮件的代码可以在网上找到现成的很多很多示例，而我们要做的事情就是大胆的灵活运用它们来解决我们的问题。 </p>
+</div>]
+</body>
+</html>

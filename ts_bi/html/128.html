@@ -1,0 +1,81 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<pre><code><span style="color: rgb(0, 128, 128);">总有些小代码用的时候很熟悉, 不用的时候时间长了, 再看到的时候就有些生了, 不知道是我一个人这样还是都是这样, 人老了, 好记性不如烂笔头吧!<br/><br/>--</span><span style="color: rgb(0, 128, 128);"> Cross Apply and Out Apply</span><br>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">AppDemo1</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> AppDemo1<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+ <br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">AppDemo2</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> AppDemo2<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+ <br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">dbo.UDF_AppDemo</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">TF</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">FUNCTION</span><span style="color: rgb(0, 0, 0);"> dbo.UDF_AppDemo<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+ <br/>
+<span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Two tables for test</span><br/>
+<span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> AppDemo1<br/>
+(<br/>
+   A </span><span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">15</span><span style="color: rgb(0, 0, 0);">),<br/>
+   B </span><span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">15</span><span style="color: rgb(0, 0, 0);">)<br/>
+)<br/>
+ <br/>
+</span><span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"> AppDemo2<br/>
+(<br/>
+   C </span><span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">15</span><span style="color: rgb(0, 0, 0);">),<br/>
+   D </span><span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">15</span><span style="color: rgb(0, 0, 0);">)<br/>
+)<br/>
+ <br/>
+</span><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);">Insert Testing Values</span><br/>
+<span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">INTO</span> AppDemo1 <span style="color: rgb(0, 0, 255);">VALUES</span><span style="color: rgb(0, 0, 0);"><br/>
+(</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">1</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">A</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">),<br/>
+(</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">3</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">),<br/>
+(</span><span style="color: rgb(0, 0, 255);">NULL</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">K</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">)<br/>
+ <br/>
+</span><span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">INTO</span> AppDemo2 <span style="color: rgb(0, 0, 255);">VALUES</span><span style="color: rgb(0, 0, 0);"><br/>
+(</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">1</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">A</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">),<br/>
+(</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">2</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">B</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">),<br/>
+(</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">1</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(0, 0, 255);">NULL</span><span style="color: rgb(0, 0, 0);">),<br/>
+(</span><span style="color: rgb(0, 0, 255);">NULL</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">X</span><span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(0, 0, 0);">)<br/>
+ <br/>
+</span><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Show records</span><br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span> AppDemo1</br></br></code></pre><p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif"/></p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201301/07150036-9741d947181349859ad3fa0f84dc2dd0.png"/></p><pre><code><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span> AppDemo2</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201301/07150105-40bcb58931cf4225ac38f39ac074e0e3.png"/></p><pre><code><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Cross Join</span><br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span> <span style="color: rgb(0, 0, 255);">FROM</span><span style="color: rgb(0, 0, 0);"> AppDemo1<br/>
+</span><span style="color: rgb(0, 0, 255);">CROSS</span> <span style="color: rgb(128, 128, 128);">JOIN</span> AppDemo2</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201301/07150140-6a1da6841b3c4db5a63c47302e386044.png"/></p><p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif"/></p><pre><code><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Table-valued function</span><br/>
+<span style="color: rgb(0, 0, 255);">CREATE</span> <span style="color: rgb(0, 0, 255);">FUNCTION</span> dbo.UDF_AppDemo(<span style="color: rgb(0, 128, 0);">@ID</span> <span style="color: rgb(0, 0, 255);">AS</span> <span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">15</span><span style="color: rgb(0, 0, 0);">))<br/>
+</span><span style="color: rgb(0, 0, 255);">RETURNS</span> <span style="color: rgb(0, 128, 0);">@VALUES</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span style="color: rgb(0, 0, 0);"><br/>
+(<br/>
+   E </span><span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">15</span><span style="color: rgb(0, 0, 0);">),<br/>
+   F </span><span style="color: rgb(0, 0, 255);">VARCHAR</span>(<span style="color: rgb(128, 0, 0); font-weight: bold;">15</span><span style="color: rgb(0, 0, 0);">)<br/>
+)<br/>
+</span><span style="color: rgb(0, 0, 255);">AS</span><br/>
+<span style="color: rgb(0, 0, 255);">BEGIN</span><br/>
+   <span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Extract records by ID</span><br/>
+   <span style="color: rgb(0, 0, 255);">INSERT</span> <span style="color: rgb(0, 0, 255);">INTO</span> <span style="color: rgb(0, 128, 0);">@VALUES</span><br/>
+   <span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span><br/>
+   <span style="color: rgb(0, 0, 255);">FROM</span> AppDemo2 <span style="color: rgb(0, 0, 255);">AS</span><span style="color: rgb(0, 0, 0);"> app<br/>
+   </span><span style="color: rgb(0, 0, 255);">WHERE</span> app.C <span style="color: rgb(128, 128, 128);">=</span> <span style="color: rgb(0, 128, 0);">@ID</span><br/>
+  <br/>
+   <span style="color: rgb(0, 0, 255);">RETURN</span><br/>
+<span style="color: rgb(0, 0, 255);">END</span><br/>
+<span style="color: rgb(0, 0, 255);">GO</span><br/>
+ <br/>
+<span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Simple cross join</span><br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span><br/>
+<span style="color: rgb(0, 0, 255);">FROM</span> AppDemo1 <span style="color: rgb(0, 0, 255);">AS</span><span style="color: rgb(0, 0, 0);"> app<br/>
+</span><span style="color: rgb(0, 0, 255);">CROSS</span> <span style="color: rgb(128, 128, 128);">JOIN</span> UDF_AppDemo(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">1</span><span style="color: rgb(255, 0, 0);">'</span>)</code></pre><p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif"/></p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201301/07150224-a5e4e96e79554c2a94570f7b207e8fa6.png"/></p><pre><code><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Cross apply</span><br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span><br/>
+<span style="color: rgb(0, 0, 255);">FROM</span> AppDemo1 <span style="color: rgb(0, 0, 255);">AS</span><span style="color: rgb(0, 0, 0);"> app<br/>
+</span><span style="color: rgb(0, 0, 255);">CROSS</span> APPLY UDF_AppDemo(app.A)</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201301/07150246-879c1a5f33204668bc453f9a752c3545.png"/></p><pre><code><span style="color: rgb(0, 128, 128);">--</span><span style="color: rgb(0, 128, 128);"> Outer apply</span><br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span><br/>
+<span style="color: rgb(0, 0, 255);">FROM</span> AppDemo1 <span style="color: rgb(0, 0, 255);">AS</span><span style="color: rgb(0, 0, 0);"> app<br/>
+</span><span style="color: rgb(128, 128, 128);">OUTER</span> APPLY UDF_AppDemo(app.A)</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201301/07150312-0966258cd0044b90b4245fa807558793.png"/><br/></p>
+</div>]
+</body>
+</html>

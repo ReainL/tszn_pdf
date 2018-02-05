@@ -1,0 +1,67 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>基于父子关系的递归结构在公司组织结构里比较常见，基本上都是在一张表里实现的自引用关系。在报表中如果要实现这种效果，并且在这个基础上做一些数据的汇总，可以使用到下面提到的方法。</p><p>要实现的效果大致如下 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/19231924-004010c70c534d58aa7e243a70e6a19e.png"/></p><p>半收起的效果 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/19232012-77ee02763c994900938d08c466254b53.png"/></p><h2 id="articleHeader2">案例演示</h2><p>从 AdventureWorks2012 中抽取一些示例数据 -</p><pre><code><span style="font-family: Microsoft Yahei; font-size: 14px;"><span style="color: rgb(0, 0, 255);">USE</span><span> BIWORK_SSIS<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">DimEmployee</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> DimEmployee<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span> <br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">IF</span> <span style="color: rgb(255, 0, 255);">OBJECT_ID</span>(<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">FactResellerSales</span><span style="color: rgb(255, 0, 0);">'</span>,<span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(255, 0, 0);">U</span><span style="color: rgb(255, 0, 0);">'</span>) <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(128, 128, 128);">NOT</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+<span style="color: rgb(0, 0, 255);">DROP</span> <span style="color: rgb(0, 0, 255);">TABLE</span><span> FactResellerSales<br/>
+</span><span style="color: rgb(0, 0, 255);">GO</span> <br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">SELECT</span><span> EmployeeKey,<br/>
+       ParentEmployeeKey,<br/>
+       EmployeeNationalIDAlternateKey,<br/>
+       FirstName </span><span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(255, 0, 0);">'</span> <span style="color: rgb(255, 0, 0);">'</span><span style="color: rgb(128, 128, 128);">+</span> LastName <span style="color: rgb(0, 0, 255);">AS</span><span> FullName,<br/>
+       Title <br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span> DimEmployee<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span><span> AdventureWorksDW2012.dbo.DimEmployee<br/>
+<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span><span> ProductKey,<br/>
+       OrderDateKey,<br/>
+       EmployeeKey,<br/>
+       SalesOrderLineNumber,<br/>
+       SalesOrderNumber,<br/>
+       UnitPrice,<br/>
+       ProductStandardCost,<br/>
+       SalesAmount<br/>
+</span><span style="color: rgb(0, 0, 255);">INTO</span><span> FactResellerSales<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span> AdventureWorksDW2012.dbo.FactResellerSales</span></code></pre><p>我们可以做一个简单的 CTE 递归查询，可以看到这些 Employee 的级别 Level </p><pre><code><span style="font-family: Microsoft Yahei; font-size: 14px;"><span style="color: rgb(0, 0, 255);">WITH</span> Employees <span style="color: rgb(0, 0, 255);">AS</span><span> <br/>
+(<br/>
+    </span><span style="color: rgb(0, 0, 255);">SELECT</span><span> EmployeeKey,<br/>
+           ParentEmployeeKey,<br/>
+           FullName,<br/>
+           Title,<br/>
+           </span><span style="color: rgb(128, 0, 0); font-weight: bold;">1</span> <span style="color: rgb(0, 0, 255);">AS</span><span> EmployeeLevel<br/>
+    </span><span style="color: rgb(0, 0, 255);">FROM</span><span> DimEmployee<br/>
+    </span><span style="color: rgb(0, 0, 255);">WHERE</span> ParentEmployeeKey <span style="color: rgb(0, 0, 255);">IS</span> <span style="color: rgb(0, 0, 255);">NULL</span><br/>
+    <span style="color: rgb(0, 0, 255);">UNION</span> <span style="color: rgb(128, 128, 128);">ALL</span><br/>
+    <span style="color: rgb(0, 0, 255);">SELECT</span><span> e.EmployeeKey,<br/>
+           e.ParentEmployeeKey,<br/>
+           e.FullName,<br/>
+           e.Title,<br/>
+           es.EmployeeLevel </span><span style="color: rgb(128, 128, 128);">+</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">1</span> <span style="color: rgb(0, 0, 255);">AS</span><span> EmployeeLevel<br/>
+    </span><span style="color: rgb(0, 0, 255);">FROM</span> DimEmployee <span style="color: rgb(0, 0, 255);">AS</span><span> e<br/>
+    </span><span style="color: rgb(0, 0, 255);">INNER</span> <span style="color: rgb(128, 128, 128);">JOIN</span> Employees <span style="color: rgb(0, 0, 255);">AS</span><span> es<br/>
+    </span><span style="color: rgb(0, 0, 255);">ON</span> es.EmployeeKey <span style="color: rgb(128, 128, 128);">=</span><span> e.ParentEmployeeKey  <br/>
+)<br/>
+</span><span style="color: rgb(0, 0, 255);">SELECT</span> <span style="color: rgb(128, 128, 128);">*</span><br/>
+<span style="color: rgb(0, 0, 255);">FROM</span><span> Employees<br/>
+</span><span style="color: rgb(0, 0, 255);">ORDER</span> <span style="color: rgb(0, 0, 255);">BY</span> EmployeeLevel,FullName</span></code></pre><p>这是我们通过 SQL 查询的方式实现级别的判断，可以看到它们的级别，那么这种级别也应该能反映到报表中。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/19232300-e3c11962341f41c7b8038d445819a691.png"/></p><p>当然在报表中不需要这么复杂的查询语句，报表中的 Dataset 只需要提供正确的父子键，也就是上面看到的 EmployeeKey 和 ParentEmployeeKey 即可。在报表中只需要简单的设置就可以实现这种父子递归汇总的效果，新建一个报表并创建好数据源，使用下面查询创建一个 Dataset - DS_ParentChild。</p><pre><code><span style="font-family: Microsoft Yahei; font-size: 14px;"><span style="color: rgb(0, 0, 255);">SELECT</span> es.<span style="color: rgb(128, 128, 128);">*</span><span>,<br/>
+       fact.SalesOrderNumber,<br/>
+       fact.UnitPrice,<br/>
+       fact.SalesAmount<br/>
+</span><span style="color: rgb(0, 0, 255);">FROM</span> DimEmployee <span style="color: rgb(0, 0, 255);">AS</span><span> es <br/>
+</span><span style="color: rgb(128, 128, 128);">LEFT</span> <span style="color: rgb(128, 128, 128);">JOIN</span> FactResellerSales <span style="color: rgb(0, 0, 255);">as</span><span> fact<br/>
+</span><span style="color: rgb(0, 0, 255);">ON</span> es.EmployeeKey <span style="color: rgb(128, 128, 128);">=</span> fact.EmployeeKey</span></code></pre><p>拖放一个 Table 并填写几个基本的字段 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/19233001-04b0aab12c914820bf46b201db126736.png"/></p><p> 选择 Group Properties 并注意这里的 Group 名称就叫做 Details。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/19233118-4142b7aa3a6046a0acf8ab635e45ec61.png"/></p><p>基本行是按照 EmployeeKey 分组的。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/19233247-fc7513ac329a465185c7dd0e54566e59.png"/></p><p>这里选择递归的父对象是 ParentEmployeeKey 指向父级成员。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/19233255-ddfe7d7ab2034734b154d884495c8512.png"/></p><p>最后可以设置按照 FullName 的点击来完成收缩或者展开效果。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/19233301-f7965ceffd4b45cfb0399718fbb3b86f.png"/></p><p>保存并预览报表，已经有一个雏形了。但是还有两个问题需要解决：第一个就是 Sales Amount 的聚合，这里和以往有所区别。第二个就是层次结构的缩进问题，以前的层次结构是固定的，所以我们可以手动敲空格，但是这次碰到的是一个不固定的层次结构。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/19233808-22feed5719af4bca992c2c2f2eeacb55.png"/></p><p>在 Sales Amount 里添加表达式，注意这里的 Details 是上面 Group 的名称，有很多人效果出不来是因为习惯性的将这里写成了 Dataset 的名称 DS_ParentChild。</p><pre><code><span style="font-family: Microsoft Yahei; font-size: 14px;"> =SUM(Fields!SalesAmount.Value,<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">Details</span><span style="color: rgb(128, 0, 0);">"</span>,Recursive)</span></code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/19234055-851610b74bba4916b37b79faa8aef7db.png"/></p><p>缩进的问题，可以通过在 FullName 的Padding属性中通过 Level() 内置函数来定义左边的 Padding 间距: =CStr(2 + (Level()*20)) + "pt"。有兴趣的话，可以直接使用 Level() 内置函数看看它在 Group 中的级别。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/19234208-008f7874a1d947cbae59839f9b505fa3.png"/></p><p>当然也可以使用这个 Level() 来控制 Sales Amount 的缩进，并且应该在Group Properties 里面设置一下 Sort 排序，可以按照 Full Name 来排序，最后保存美化之后的效果就是这样的。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/19231924-004010c70c534d58aa7e243a70e6a19e.png"/></p><p>下次再来看在 Cube 中通过 MDX 查询来实现这种父子递归效果。</p>
+</div>]
+</body>
+</html>

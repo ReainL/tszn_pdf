@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<p>通常情况下，SSRS 报表在页面内容过多的时候会自动分页。但有的时候当页面内容不是很多，大概最多2页的情况下，或者客户要求所有内容必须在一页显示时，应该如何设置。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201407/061951473408267.png"/></p><p>实际上，要考虑两种情况：第一种情况是在开发阶段的设置。第二种情况是在报表已经部署的服务器，或者部署到 SharePoint 或者 CRM 后，这时就不能在开发工具上更改了。</p><p>第一种情况，直接设置报表属性，将 Interactive Size - Height 大小调整成合适的值，默认通常是11 in，可以调整到 25 左右一般可以满足2页合并成一页的情况。如果不知道具体有多少页，就设置成 0 in，表示无限。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201407/061953055274753.png"/></p><p>第二种情况，报表在已经部署的情况下是不可能再使用开发工具修改了，因为比如在 SharePoint 或者 CRM 中都是通常上传 RDL 文件的方式，因此要通过修改 RDL 文件来实现。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201407/061955158876179.png"/></p><p>右键编辑 RDL 报表文件，实际上就是一个 XML 结构的文档，搜索 InteractiveHeight 如果没有搜索到，就在 Page/Style 节点中添加它。或者找到了，就可以将值修改为 0 in，这样就实现了报表在一页中显示的效果。<br/></p>
+</div>]
+</body>
+</html>

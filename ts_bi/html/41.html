@@ -1,0 +1,134 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>这一篇文章是 <a href="http://www.flybi.net/blog/biwork/597" target="_blank"><u><font color="#0066cc">微软BI 之SSIS 系列 - 带有 Header 和 Trailer 的不规则的平面文件输出处理技巧 </font></u></a> 的续篇，在上篇文章中介绍到了对于这种不规则文件输出的处理方式。比如下图中的这种不规则文件，第一行，第二行 Header 部分，第三行的内容 Content 部分，最后一行的 Trailer 部分。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062146082331529.png"/></p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062146176088164.png"/></p><p>在前几个课程 <a href="http://www.hellobi.com/course/21" target="_blank"><u><font color="#0066cc">微软BI SSIS 2012 ETL 控件与案例精讲</font></u></a> 第43,44,45,46 课中，我分别讲解了如何使用 .Script Component Source 解析不规则文件（第43,44课），如何使用 Script Component 同步 Transformation 转换处理不规则文件（第45课），以及使用异步的 Transformation 转换不规则文件（第46课），今天我们讲解的是 Script Component Destination。即把 Script Component 作为一个 Destination 目标来使用，既然是 Destination 组件，那么就应该是以接受来自上游的 Input 输入并对数据进行清洗处理。并且，一般的 Destination 要么就是数据库表，要么就是文件，即我们是借用 Script Component 往表或者文件中插入数据。</p><h2 id="articleHeader2">使用 Script Component Destination</h2><p>我们还是使用之前的不规则文件作为本篇的例子来讲解。这是 <a href="http://www.flybi.net/blog/biwork/597" target="_blank"><u><font color="#0066cc">微软BI 之SSIS 系列 - 带有 Header 和 Trailer 的不规则的平面文件输出处理技巧</font></u></a> 这篇文章中用到的文件格式描述。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062152326083600.png"/></p><p>和之前的几个课程的配置，文件链接等方式一样，略。添加一个新的 Script Component 并选择使用 Destination。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062152513587871.png"/></p><p>这里仍然选择 EMPLOYEE 作为 INPUT 输入项，文件源配置参照前几课的设置。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062154349519023.png"/></p><p>在 Script 中访问 SQL Server 数据库表，应通过 ADO.NET 链接方式访问数据库表。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062155157483493.png"/></p><p>链接到课程指定的 DEMO 数据库。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062156115763137.png"/></p><p>跟 Script Component - Source 中处理一样，取一个名称 - CON_ADO。或者先在链接管理器中先创建好一个 ADO.NET 链接管理器，然后再关联也是可以的。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062157062953752.png"/></p><p>将上方的文件源关联起来，注意到下方 ADO.NET 连接管理器已经创建了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062158129838246.png"/></p><p>在 Script 脚本中使用 ADO.NET 编程方式需要引入这个 NameSpace 命名空间。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062159035457065.png"/></p><p>具体代码部分参照如下，具体讲解请参看视频：</p><pre><code><span style="color: rgb(0, 0, 255);">#region</span> Help:  Introduction to the Script Component<br/>
+<span style="color: rgb(0, 128, 0);">/*</span><span style="color: rgb(0, 128, 0);"> The Script Component allows you to perform virtually any operation that can be accomplished in<br/>
+ * a .Net application within the context of an Integration Services data flow.<br/>
+ *<br/>
+ * Expand the other regions which have "Help" prefixes for examples of specific ways to use<br/>
+ * Integration Services features within this script component. </span><span style="color: rgb(0, 128, 0);">*/</span><br/>
+<span style="color: rgb(0, 0, 255);">#endregion</span><br/>
+<br/>
+<span style="color: rgb(0, 0, 255);">#region</span> Namespaces<br/>
+<span style="color: rgb(0, 0, 255);">using</span><span style="color: rgb(0, 0, 0);"> System;<br/>
+</span><span style="color: rgb(0, 0, 255);">using</span><span style="color: rgb(0, 0, 0);"> System.Data;<br/>
+</span><span style="color: rgb(0, 0, 255);">using</span><span style="color: rgb(0, 0, 0);"> Microsoft.SqlServer.Dts.Pipeline.Wrapper;<br/>
+</span><span style="color: rgb(0, 0, 255);">using</span><span style="color: rgb(0, 0, 0);"> Microsoft.SqlServer.Dts.Runtime.Wrapper;<br/>
+</span><span style="color: rgb(0, 0, 255);">using</span> System.Data.SqlClient; <span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> 需要引入的 ADO.NET 访问</span><br/>
+<span style="color: rgb(0, 0, 255);">#endregion</span><br/>
+<br/>
+<span style="color: rgb(128, 128, 128);">///</span> <span style="color: rgb(128, 128, 128);">&lt;summary&gt;</span><br/>
+<span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);"> This is the class to which to add your code.  Do not change the name, attributes, or parent<br/>
+</span><span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);"> of this class.<br/>
+</span><span style="color: rgb(128, 128, 128);">///</span> <span style="color: rgb(128, 128, 128);">&lt;/summary&gt;</span><br/>
+<span style="color: rgb(0, 0, 0);">[Microsoft.SqlServer.Dts.Pipeline.SSISScriptComponentEntryPointAttribute]<br/>
+</span><span style="color: rgb(0, 0, 255);">public</span> <span style="color: rgb(0, 0, 255);">class</span><span style="color: rgb(0, 0, 0);"> ScriptMain : UserComponent<br/>
+{ <br/>
+    </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);">连接管理器接口</span><br/>
+<span style="color: rgb(0, 0, 0);">    IDTSConnectionManager100 con;<br/>
+<br/>
+    </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);">数据库访问对象 </span><br/>
+<span style="color: rgb(0, 0, 0);">    SqlConnection sqlConn;<br/>
+    SqlCommand sqlCommand1;<br/>
+    SqlCommand sqlCommand2; <br/>
+    SqlParameter sqlParameter; <br/>
+<br/>
+    </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> 需要重写的方法 初始化数据库连接</span><br/>
+    <span style="color: rgb(0, 0, 255);">public</span> <span style="color: rgb(0, 0, 255);">override</span> <span style="color: rgb(0, 0, 255);">void</span> AcquireConnections(<span style="color: rgb(0, 0, 255);">object</span><span style="color: rgb(0, 0, 0);"> Transaction)<br/>
+    {   <br/>
+        </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> Script Component 关联的 ADO.NET 连接管理器</span><br/>
+        con = <span style="color: rgb(0, 0, 255);">this</span><span style="color: rgb(0, 0, 0);">.Connections.CONADO; <br/>
+        sqlConn </span>= (SqlConnection)con.AcquireConnection(<span style="color: rgb(0, 0, 255);">null</span><span style="color: rgb(0, 0, 0);">);<br/>
+    }<br/>
+    <br/>
+    </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> 初始化SQL语句与参数</span><br/>
+    <span style="color: rgb(0, 0, 255);">public</span> <span style="color: rgb(0, 0, 255);">override</span> <span style="color: rgb(0, 0, 255);">void</span><span style="color: rgb(0, 0, 0);"> PreExecute()<br/>
+    {<br/>
+        </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);">INSERT INTO T046_EMPLOYEE_FILE_EXTRACTION VALUES(@FILE_CREATED_DATE,@TOTAL_EMPLOYEES)<br/>
+        </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);">INSERT INTO T046_EMPLOYEES VALUES(@EMP_NAME,@POSITION,@HIRED_DATE,@BIRTH_DATE,@EMAIL,@PHONE,@MARRIAGE)</span><br/>
+        sqlCommand1 = <span style="color: rgb(0, 0, 255);">new</span> SqlCommand(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">INSERT INTO T046_EMPLOYEE_FILE_EXTRACTION VALUES(@FILE_CREATED_DATE,@TOTAL_EMPLOYEES)</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">,sqlConn);<br/>
+        sqlCommand2 </span>= <span style="color: rgb(0, 0, 255);">new</span> SqlCommand(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">INSERT INTO T046_EMPLOYEES VALUES(@EMP_NAME,@POSITION,@HIRED_DATE,@BIRTH_DATE,@EMAIL,@PHONE,@MARRIAGE)</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">, sqlConn);<br/>
+<br/>
+        </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> For Table T046_EMPLOYEE_FILE_EXTRACTION</span><br/>
+        sqlParameter = <span style="color: rgb(0, 0, 255);">new</span> SqlParameter(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@FILE_CREATED_DATE</span><span style="color: rgb(128, 0, 0);">"</span>, SqlDbType.NVarChar, <span style="color: rgb(128, 0, 128);">50</span><span style="color: rgb(0, 0, 0);">);<br/>
+        sqlCommand1.Parameters.Add(sqlParameter);<br/>
+        sqlParameter </span>= <span style="color: rgb(0, 0, 255);">new</span> SqlParameter(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@TOTAL_EMPLOYEES</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">, SqlDbType.Int);<br/>
+        sqlCommand1.Parameters.Add(sqlParameter);<br/>
+<br/>
+        </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> For Table T046_EMPLOYEES</span><br/>
+        sqlParameter = <span style="color: rgb(0, 0, 255);">new</span> SqlParameter(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@EMP_NAME</span><span style="color: rgb(128, 0, 0);">"</span>, SqlDbType.NVarChar, <span style="color: rgb(128, 0, 128);">50</span><span style="color: rgb(0, 0, 0);">);<br/>
+        sqlCommand2.Parameters.Add(sqlParameter);<br/>
+        sqlParameter </span>= <span style="color: rgb(0, 0, 255);">new</span> SqlParameter(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@POSITION</span><span style="color: rgb(128, 0, 0);">"</span>, SqlDbType.NVarChar, <span style="color: rgb(128, 0, 128);">50</span><span style="color: rgb(0, 0, 0);">);<br/>
+        sqlCommand2.Parameters.Add(sqlParameter);<br/>
+        sqlParameter </span>= <span style="color: rgb(0, 0, 255);">new</span> SqlParameter(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@HIRED_DATE</span><span style="color: rgb(128, 0, 0);">"</span>, SqlDbType.NVarChar, <span style="color: rgb(128, 0, 128);">50</span><span style="color: rgb(0, 0, 0);">);<br/>
+        sqlCommand2.Parameters.Add(sqlParameter);<br/>
+        sqlParameter </span>= <span style="color: rgb(0, 0, 255);">new</span> SqlParameter(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@BIRTH_DATE</span><span style="color: rgb(128, 0, 0);">"</span>, SqlDbType.NVarChar, <span style="color: rgb(128, 0, 128);">50</span><span style="color: rgb(0, 0, 0);">);<br/>
+        sqlCommand2.Parameters.Add(sqlParameter);<br/>
+        sqlParameter </span>= <span style="color: rgb(0, 0, 255);">new</span> SqlParameter(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@EMAIL</span><span style="color: rgb(128, 0, 0);">"</span>, SqlDbType.NVarChar, <span style="color: rgb(128, 0, 128);">50</span><span style="color: rgb(0, 0, 0);">);<br/>
+        sqlCommand2.Parameters.Add(sqlParameter);<br/>
+        sqlParameter </span>= <span style="color: rgb(0, 0, 255);">new</span> SqlParameter(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@PHONE</span><span style="color: rgb(128, 0, 0);">"</span>, SqlDbType.NVarChar, <span style="color: rgb(128, 0, 128);">25</span><span style="color: rgb(0, 0, 0);">);<br/>
+        sqlCommand2.Parameters.Add(sqlParameter);<br/>
+        sqlParameter </span>= <span style="color: rgb(0, 0, 255);">new</span> SqlParameter(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@MARRIAGE</span><span style="color: rgb(128, 0, 0);">"</span>, SqlDbType.NVarChar, <span style="color: rgb(128, 0, 128);">2</span><span style="color: rgb(0, 0, 0);">);<br/>
+        sqlCommand2.Parameters.Add(sqlParameter); <br/>
+    } <br/>
+<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span> <span style="color: rgb(128, 128, 128);">&lt;summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);"> This method is called once for every row that passes through the component from Input0.<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span><br/>
+    <span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);"> Example of reading a value from a column in the the row:<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);">  string zipCode = Row.ZipCode<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span><br/>
+    <span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);"> Example of writing a value to a column in the row:<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);">  Row.ZipCode = zipCode<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span> <span style="color: rgb(128, 128, 128);">&lt;/summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128);">///</span> <span style="color: rgb(128, 128, 128);">&lt;param name="Row"&gt;</span><span style="color: rgb(0, 128, 0);">The row that is currently passing through the component</span><span style="color: rgb(128, 128, 128);">&lt;/param&gt;</span><br/>
+    <span style="color: rgb(0, 0, 255);">public</span> <span style="color: rgb(0, 0, 255);">override</span> <span style="color: rgb(0, 0, 255);">void</span><span style="color: rgb(0, 0, 0);"> Input0_ProcessInputRow(Input0Buffer Row)<br/>
+    {<br/>
+        </span><span style="color: rgb(0, 0, 255);">if</span> (Row.EMPLOYEE.StartsWith(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">FILE CREATED DATE</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">))<br/>
+        {<br/>
+            </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> 则只取文件日期部分</span><br/>
+            sqlCommand1.Parameters[<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@FILE_CREATED_DATE</span><span style="color: rgb(128, 0, 0);">"</span>].Value = Row.EMPLOYEE.Substring(<span style="color: rgb(128, 0, 128);">19</span>, <span style="color: rgb(128, 0, 128);">10</span><span style="color: rgb(0, 0, 0);">);<br/>
+            sqlCommand1.Parameters[</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@TOTAL_EMPLOYEES</span><span style="color: rgb(128, 0, 0);">"</span>].Value = <span style="color: rgb(128, 0, 128);">0</span><span style="color: rgb(0, 0, 0);">;<br/>
+            sqlCommand1.ExecuteNonQuery();<br/>
+        }<br/>
+        </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> 如果达到第二行</span><br/>
+        <span style="color: rgb(0, 0, 255);">else</span> <span style="color: rgb(0, 0, 255);">if</span> (Row.EMPLOYEE.StartsWith(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">TOTAL EMPLOYEES</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">))<br/>
+        {<br/>
+            sqlCommand1.Parameters[</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@FILE_CREATED_DATE</span><span style="color: rgb(128, 0, 0);">"</span>].Value = <span style="color: rgb(128, 0, 0);">""</span><span style="color: rgb(0, 0, 0);">;<br/>
+            sqlCommand1.Parameters[</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@TOTAL_EMPLOYEES</span><span style="color: rgb(128, 0, 0);">"</span>].Value = <span style="color: rgb(0, 0, 255);">int</span>.Parse(Row.EMPLOYEE.Substring(<span style="color: rgb(128, 0, 128);">16</span>, <span style="color: rgb(128, 0, 128);">10</span><span style="color: rgb(0, 0, 0);">));<br/>
+<br/>
+            sqlCommand1.ExecuteNonQuery();<br/>
+        }<br/>
+        </span><span style="color: rgb(0, 0, 255);">else</span> <span style="color: rgb(0, 0, 255);">if</span> (Row.EMPLOYEE.StartsWith(<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">*</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(0, 0, 0);">))<br/>
+        {<br/>
+            </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);">不做处理</span><br/>
+<span style="color: rgb(0, 0, 0);">        }<br/>
+        </span><span style="color: rgb(0, 0, 255);">else</span><span style="color: rgb(0, 0, 0);"><br/>
+        {<br/>
+            </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> 剩下的部分是主体内容部分，直接按照固定的列位置描述截取字符串 </span><br/>
+            sqlCommand2.Parameters[<span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@EMP_NAME</span><span style="color: rgb(128, 0, 0);">"</span>].Value = Row.EMPLOYEE.Substring(<span style="color: rgb(128, 0, 128);">0</span>, <span style="color: rgb(128, 0, 128);">50</span><span style="color: rgb(0, 0, 0);">);<br/>
+            sqlCommand2.Parameters[</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@POSITION</span><span style="color: rgb(128, 0, 0);">"</span>].Value = Row.EMPLOYEE.Substring(<span style="color: rgb(128, 0, 128);">50</span>, <span style="color: rgb(128, 0, 128);">50</span><span style="color: rgb(0, 0, 0);">);<br/>
+            sqlCommand2.Parameters[</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@HIRED_DATE</span><span style="color: rgb(128, 0, 0);">"</span>].Value = Row.EMPLOYEE.Substring(<span style="color: rgb(128, 0, 128);">100</span>, <span style="color: rgb(128, 0, 128);">12</span><span style="color: rgb(0, 0, 0);">);<br/>
+            sqlCommand2.Parameters[</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@BIRTH_DATE</span><span style="color: rgb(128, 0, 0);">"</span>].Value = Row.EMPLOYEE.Substring(<span style="color: rgb(128, 0, 128);">112</span>, <span style="color: rgb(128, 0, 128);">12</span><span style="color: rgb(0, 0, 0);">);<br/>
+            sqlCommand2.Parameters[</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@EMAIL</span><span style="color: rgb(128, 0, 0);">"</span>].Value = Row.EMPLOYEE.Substring(<span style="color: rgb(128, 0, 128);">124</span>, <span style="color: rgb(128, 0, 128);">50</span><span style="color: rgb(0, 0, 0);">);<br/>
+            sqlCommand2.Parameters[</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@PHONE</span><span style="color: rgb(128, 0, 0);">"</span>].Value = Row.EMPLOYEE.Substring(<span style="color: rgb(128, 0, 128);">174</span>, <span style="color: rgb(128, 0, 128);">25</span><span style="color: rgb(0, 0, 0);">);<br/>
+            sqlCommand2.Parameters[</span><span style="color: rgb(128, 0, 0);">"</span><span style="color: rgb(128, 0, 0);">@MARRIAGE</span><span style="color: rgb(128, 0, 0);">"</span>].Value = Row.EMPLOYEE.Substring(<span style="color: rgb(128, 0, 128);">199</span>, <span style="color: rgb(128, 0, 128);">1</span><span style="color: rgb(0, 0, 0);">);<br/>
+<br/>
+            sqlCommand2.ExecuteNonQuery();<br/>
+        }   <br/>
+    }<br/>
+   <br/>
+    </span><span style="color: rgb(0, 128, 0);">//</span><span style="color: rgb(0, 128, 0);"> 直接重写连接释放</span><br/>
+    <span style="color: rgb(0, 0, 255);">public</span> <span style="color: rgb(0, 0, 255);">override</span> <span style="color: rgb(0, 0, 255);">void</span><span style="color: rgb(0, 0, 0);"> ReleaseConnections()<br/>
+    {<br/>
+        </span><span style="color: rgb(0, 0, 255);">base</span><span style="color: rgb(0, 0, 0);">.ReleaseConnections();<br/>
+    }<br/>
+}</span></code></pre><p>执行结果。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062201292482187.png"/></p><p>查询结果如下：</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062204089055210.png"/></p><p>对于第一张表，通过简单的 SQL 语句即可以解决这个合并问题。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/062204441237884.png"/></p><h2 id="articleHeader3">总结</h2><p>其实对比 Script Component Source，Script Component Transformation (同步或异步) 这三种不规则的文件解析方式来说，前面几种是最简单的，特别是 Script Component Source 可以非常直观的看到两个解析之后的 Output 操作。并且我们的这四个案例，不同的解决方式实际上就是把解析不规则文件的过程分别放在了 Source 端，同步的 Transformation 端，异步的 Transformation 端，Destination 端。 不同的位置，解析的过程不一样，对输出的处理不一样。并且通过这样的一个案例可以让我们对 Source, 同步转换，异步转换这些概念更加深刻了。</p><p>并且在这些个案例中，我们能够看到 Script Component 强大的自定义编程能力，文件访问，数据库访问，同步转换，异步遍历等不同的解决方案。在实际的 ETL 项目中，我们可以针对不同的场景灵活的使用 Script Component 来解决这些问题。</p><p>最后，还是要提醒一下就这种不规则的文件处理不要使用 Script Component Destination 来处理，关于它的效率问题从下图中就可以看得出来。以下测试环境为3G左右的虚机，包括磁盘空间也都很紧张，具体的测试数据在不同的环境下可能表现不同。</p><p>而原因其实可以分析出来：</p><ul><li>Script Component Transformation 异步转换并不是一个完全阻塞组件，它是一个半阻塞组件。在拿到上游的全部或者部分 Buffer 的时候，ProcessInput() 方法 就已经开始工作了，处理一部分 Buffer 就往下输出一部分 Buffer。并且在通过 OLE DB Destination 组件的时候，也是批量插入，因此在本案例中效率最高。</li><li>Script Component Source 是我以前在项目中经常使用到的一种方式，也是比较喜欢的一种方式。但是通常的做法就一次从文件读取一行，然后输出一行导致效率没有 Transformation 异步转换高。由于文件一般都是200 - 500MB，因此没有遇到特别大的性能问题，所以就没有进一步的优化。</li><li>Script Component Transformation 同步转换是一个非阻塞组件，但是由于一次处理一行输出一行，这个过程略微花费一点时间。</li><li>Script Component Destination 并不是一个完整意义上的转换组件，在本案例中是作为一个 Destination 组件来处理，受 ProcessInputRow() 方法限制也是一行一行的通过 ADO.NET 方式插入，因此效率最低。</li></ul><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/090005216969928.png"/></p><p>关于阻塞，半阻塞，同步和异步的文章可以参考 <a href="http://www.flybi.net/blog/biwork/998" target="_blank"><u><font color="#0066cc">微软BI 之SSIS 系列 - 理解Data Flow Task 中的同步与异步, 阻塞,半阻塞和全阻塞以及Buffer 缓存概念</font></u></a> 此文中提到的 Script Component 是以默认的同步 Transformation 转换组件为例，因此归在 Non-Blocking 部分。<br/></p>
+</div>]
+</body>
+</html>

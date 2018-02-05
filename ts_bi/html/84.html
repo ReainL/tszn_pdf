@@ -1,0 +1,20 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>这篇小文章的来源是 <a href="http://www.flybi.net/question/1321"><u><font color="#0066cc">天善问答</font></u></a>，比如在报表中要根据点击某一个成员名称然后作为参数传递给自身报表或者下一张报表，这个在普通的 SQL 查询中没有任何问题。但是在 MDX 中查询是有区别的，比如在 MDX 中显示在报表上的结果是 Category 下的一个分类 Bikes，但是当点击了 Bikes之后把 Bikes 作为参数传递下一个 MDX 查询的报表中，很显然我们要的是参数 [Product].[Product Categories].[Category].&amp;[2] 去作为过滤条件。如果实现知道点击成员的层次结构路径，那么我们可以事先将整个成员的字符串准备好，然后只更改值的部分。但是如果成员实现不知道是哪一个层次上的话，就不好处理了。</p><h2 id="articleHeader2">MEMBER PROPERTIES</h2><p>这样要使用到成员的一些相关属性 -</p><pre><code><span style="font-size: 14px;"><span style="font-family: Microsoft Yahei;"><span style="color: rgb(0, 0, 255);">SELECT</span> {} <span style="color: rgb(0, 0, 255);">on</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">0</span><span>, <br/>
+       </span><span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);">Product</span><span style="color: rgb(255, 0, 0);">]</span>.<span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);">Product Categories</span><span style="color: rgb(255, 0, 0);">]</span>.<span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);">Category</span><span style="color: rgb(255, 0, 0);">]</span><span>.MEMBERS <br/>
+        DIMENSION PROPERTIES <br/>
+        MEMBER_CAPTION, <br/>
+        UNIQUE_NAME, <br/>
+        LEVEL_UNIQUE_NAME, <br/>
+        MEMBER_KEY <br/>
+        </span><span style="color: rgb(0, 0, 255);">ON</span> <span style="color: rgb(128, 0, 0); font-weight: bold;">1</span> <br/>
+<span style="color: rgb(0, 0, 255);">FROM</span> <span style="color: rgb(255, 0, 0);">[</span><span style="color: rgb(255, 0, 0);">Step-by-Step</span><span style="color: rgb(255, 0, 0);">]</span></span></span></code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/092306005358.png"/></p><p>双击查询出来的成员值之后可以看到相关的属性，这样的查询结果如果在 SSRS 编辑器中，这些属性会跟随成员本身出现的。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/092304078160.png"/></p><p>SSRS 中的编辑器 MDX 查询会出现全部的属性，这些属性也将作为 Dataset 的字段出现。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/092306103634.png"/></p><p>属性以字段的形式出现。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/092308117547.png"/></p><p>先设置好四个字符串参数变量，然后拖放到相关区域，当点击 Category 部分时候跳转到自身报表，然后显示相关参数的值。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/092310002545.png"/></p><p>点击 Category 编辑它的 Action 动作，跳转到自身，然后把其它的几个属性作为参数传递。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/092314167388.png"/></p><p>点击 Clothing 如果在普通 SQL 查询的时候就是传递 Clothing。但是在 MDX 中查询，可以传递很多种参数格式，但可能常用的是Unique Name，比如写到 WHERE 过滤中。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/092314304102.png"/></p><p>点击 Accessories 时 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201401/092314599732.png"/></p><p>关于 MEMBER PROPERTIES 还有其它的很多属性，可以参看 <a href="http://technet.microsoft.com/en-us/library/ms145528.aspx"><u><font color="#0066cc">MSDN</font></u></a>。<br/></p>
+</div>]
+</body>
+</html>

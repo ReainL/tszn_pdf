@@ -1,0 +1,58 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>上午在天善回答看到这个问题 - <a href="http://www.flybi.net/question/1261"><u><font color="#0066cc">SSIS 导出数据文件,能否在第一列增加一个行号</font></u></a>，很快就帮助解决了，方法就是在 SQL 查询的时候加一个 ROW_NUMBER() 就可以了。</p><p>后来想起在两年前我的第一个 BI 项目上也有类似的文件输出需求，但是比这个要复杂的多，因为涉及到多个输入列的逻辑判断和计算问题，比如还有一些 XML 格式的数据。这些逻辑不能直接在 SQL 查询时直接实现，比如还要做 XML 格式验证，字符串匹配查找，还有其它的比较复杂的逻辑。所以就选择了另外一种方式 - 在数据源输入和文件输出组件之间加了一个 Script Component 组件，利用它程序化处理添加了必要的输出列供下游使用，当然逻辑比较复杂在 Script Component 中写了不少代码还有异常记录输出等。</p><p>虽然没有必要使用 Script Component 来解决这个问题，但是还是可以通过这个小例子简单介绍一下 Script Component，多了解一种方法，在项目需要的时候就多一种选择。</p><h2 id="articleHeader2">使用 Script Component 为数据流输出添加行号</h2><p>数据源可以随便选用一张表来进行测试输出。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/27154248-525edf17d0024e25b0de9560ad6d8f24.png"/></p><p>数据源向下的输出列 -</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/27154337-662ce416cc3e48c29d9db707c2bd6764.png"/></p><p>拖放一个排序控件，如果希望输出的格式按某列排序的话，可以选择一个列来排序，这里使用 FullName 进行排序。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/27154412-1b5d80f8af044cd7825197bf0a255176.png"/></p><p>拖放一个 Script Component，这里要选择 Transfomation 转换，意味着在输入源和输出目的地之间进行中间转换的组件。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/27154421-8c441ad8c0b24c17b7b67f28005a3681.png"/></p><p>如果以后在 Script 中有比较复杂的逻辑运算需要使用到输入源的某些列的话，可以在这里选中它。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/27154431-098e265e73ea45e3a670e7640a0b78b5.png"/></p><p>最重要的就是这里的输出列了，这个输出列之前并不存在，是通过 Script Component 创建出来的，后面可以使用到的。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/27154440-465afd20215846e0b7ad4af887669c6d.png"/></p><p>选择 Script 项并点击 Edit Script 打开之后就能看到这些代码，这里面有几个方法。</p><ul><li>PreExecute() - 只会被调用一次，在数据流执行到这个控件的时候调用，并且是在所有行处理前调用，可以在这里做一些初始化计算。</li><li>PostExecute() - 当所有行全部处理完之后调用，可以在这里和 PreExecute() 配合起来记录处理的时间，时长等等。</li></ul><pre><code><span style="color: rgb(128, 128, 128);">///</span> <span style="color: rgb(128, 128, 128);">&lt;summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);"> This method is called once, before rows begin to be processed in the data flow.<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span><br/>
+    <span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);"> You can remove this method if you don't need to do anything here.<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span> <span style="color: rgb(128, 128, 128);">&lt;/summary&gt;</span><br/>
+    <span style="color: rgb(0, 0, 255);">public</span> <span style="color: rgb(0, 0, 255);">override</span> <span style="color: rgb(0, 0, 255);">void</span><span style="color: rgb(0, 0, 0);"> PreExecute()<br/>
+    {<br/>
+        </span><span style="color: rgb(0, 0, 255);">base</span><span style="color: rgb(0, 0, 0);">.PreExecute();<br/>
+        </span><span style="color: rgb(0, 128, 0);">/*</span><span style="color: rgb(0, 128, 0);"><br/>
+         * Add your code here<br/>
+         </span><span style="color: rgb(0, 128, 0);">*/</span><span style="color: rgb(0, 0, 0);"><br/>
+    }<br/>
+<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span> <span style="color: rgb(128, 128, 128);">&lt;summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);"> This method is called after all the rows have passed through this component.<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span><br/>
+    <span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);"> You can delete this method if you don't need to do anything here.<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span> <span style="color: rgb(128, 128, 128);">&lt;/summary&gt;</span><br/>
+    <span style="color: rgb(0, 0, 255);">public</span> <span style="color: rgb(0, 0, 255);">override</span> <span style="color: rgb(0, 0, 255);">void</span><span style="color: rgb(0, 0, 0);"> PostExecute()<br/>
+    {<br/>
+        </span><span style="color: rgb(0, 0, 255);">base</span><span style="color: rgb(0, 0, 0);">.PostExecute();<br/>
+        </span><span style="color: rgb(0, 128, 0);">/*</span><span style="color: rgb(0, 128, 0);"><br/>
+         * Add your code here<br/>
+         </span><span style="color: rgb(0, 128, 0);">*/</span><span style="color: rgb(0, 0, 0);"><br/>
+    }<br/>
+<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span> <span style="color: rgb(128, 128, 128);">&lt;summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);"> This method is called once for every row that passes through the component from Input0.<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span><br/>
+    <span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);"> Example of reading a value from a column in the the row:<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);">  string zipCode = Row.ZipCode<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span><br/>
+    <span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);"> Example of writing a value to a column in the row:<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span><span style="color: rgb(0, 128, 0);">  Row.ZipCode = zipCode<br/>
+    </span><span style="color: rgb(128, 128, 128);">///</span> <span style="color: rgb(128, 128, 128);">&lt;/summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128);">///</span> <span style="color: rgb(128, 128, 128);">&lt;param name="Row"&gt;</span><span style="color: rgb(0, 128, 0);">The row that is currently passing through the component</span><span style="color: rgb(128, 128, 128);">&lt;/param&gt;</span><br/>
+    <span style="color: rgb(0, 0, 255);">public</span> <span style="color: rgb(0, 0, 255);">override</span> <span style="color: rgb(0, 0, 255);">void</span><span style="color: rgb(0, 0, 0);"> Input0_ProcessInputRow(Input0Buffer Row)<br/>
+    {<br/>
+        </span><span style="color: rgb(0, 128, 0);">/*</span><span style="color: rgb(0, 128, 0);"><br/>
+         * Add your code here<br/>
+         </span><span style="color: rgb(0, 128, 0);">*/</span><span style="color: rgb(0, 0, 0);"><br/>
+    }</span></code></pre><p>最后的一个方法是我们要使用到的，就是转换处理。在方法外面定义一个变量，表示行号从 1 开始。方法参数 Row 已经将之前在 Script Component 中引用的 InputColumn 和 创建的 OutputColumn 全部包装成了属性，直接可以通过 Input0Buffer Row 来调用。 那么每进来一行数据，这个方法就被调用一次并同时向下输出一次。也就是说进来一行，处理一行，出去一行。</p><pre><code>    <span style="color: rgb(0, 0, 255);">int</span> rowNumber = <span style="color: rgb(128, 0, 128);">1</span><span style="color: rgb(0, 0, 0);">;<br/>
+    </span><span style="color: rgb(0, 0, 255);">public</span> <span style="color: rgb(0, 0, 255);">override</span> <span style="color: rgb(0, 0, 255);">void</span><span style="color: rgb(0, 0, 0);"> Input0_ProcessInputRow(Input0Buffer Row)<br/>
+    {<br/>
+        Row.RowNumber </span>=<span style="color: rgb(0, 0, 0);"> rowNumber;<br/>
+        rowNumber </span>= rowNumber + <span style="color: rgb(128, 0, 128);">1</span><span style="color: rgb(0, 0, 0);">;<br/>
+    }</span></code></pre><p>保存并执行包，开启一个 Data Viewer 查看一下运行时的数据，就能看到 RowNumber 已经创建好了，下游就可以向文件写入数据了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/27154452-33086797c9b343c0a2fa05804cfb30bf.png"/></p><h2 id="articleHeader3">使用 ROW_NUMBER()来实现添加数据流的行号</h2><p>当然对于这个例子，直接使用 ROW_NUMBER() 最简单了，维护成本很低。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/27154510-825710843eed4ef99afe2b0c73a3a1fc.png"/></p><p>一步就搞定了同样的效果。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/27154517-899cabae72c94cf49fb99a2e5df1a38a.png"/><br/><br/></p>
+</div>]
+</body>
+</html>

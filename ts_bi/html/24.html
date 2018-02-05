@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>来自 <a href="http://school.flybi.net/" target="_blank">天善学院</a> 一个学员的问题，如何在 SSIS 中导入 ACCESS 数据表中的数据。</p><h2 id="articleHeader2">在 SSIS 中导入 ACCESS 数据库数据</h2><p>ACCESS 实际上是一个轻量级的桌面数据库，直接使用文件形式存储。在国内大量使用 ACCESS 作为 BI 数据源并不多，但是在国外特别是美国使用的还比较多，因为他们的 IT 基础起步比较早。在我的第一个美国的医疗保险项目中，就遇到过大量的 ACCESS 数据源，前后总共有 500 多个 ACCESS 表。而现在从国外一些朋友反馈的情况仍然还有在使用，所以还是有必要记录一下这个小知识点。</p><p>下面演示在 SQL Server 2012 中的 ACCESS  2013 数据表的导入，打开 ACCESS 2013。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/072057479203469.png"/></p><p>新建一个桌面数据库。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/072058394054075.png"/></p><p>新建一张表并添加部分测试数据。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/072058493734597.png"/></p><p>新建包和一个数据流 Data Flow Task，数据源使用 OLE DB Source。新建连接管理器，使用 Microsoft Office 12.0 Access Database Engine OLE DB Provider。</p><p>PS: 请参考 <a href="http://www.flybi.net/blog/biwork/599" target="_blank">微软BI 之SSIS 系列 - 通过 OLE DB 连接访问 Excel 2013 以及对不同 Sheet 页的数据处理</a> 下载并安装这个驱动。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/072059110301380.png"/></p><p>直接复制拷贝 ACCESS 数据库文件地址，如果没有密码的话可以提供 Blank Password 空白密码。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/072102224676194.png"/></p><p>后面的使用就和普通的 SQL Server 数据导入一样的过程了 - 指定数据库，数据表源。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/072103212013052.png"/></p><p>预览数据。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/072103477337245.png"/></p><p>使用 OLE DB Destination。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/072104030768091.png"/></p><p>指定目标数据库和目标表。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/072104202172421.png"/></p><p>Mapping。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/072104388731423.png"/></p><p>保存并执行包，数据流执行结果。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/072104523263112.png"/></p><p>查看测试数据表结果。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201412/072105173268807.png"/></p>
+</div>]
+</body>
+</html>

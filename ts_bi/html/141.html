@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>在 Windows Server 2008 R2 中安装 SQL Server 2012 之前先需要安装 .NET Framework 3.5 SP1</p><p>3.5 SP1 - <a href="http://www.microsoft.com/en-us/download/details.aspx?id=22"><u><font color="#0066cc">http://www.microsoft.com/en-us/download/details.aspx?id=22</font></u></a> (不需要下载, 后面会有说明, 只列出来参考)</p><p>安装的过程中出现错误 "<span style="color: rgb(255, 0, 0);">You must use the Role Management Tool to install or configure Microsoft .NET Framework 3.5 SP1</span>"</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201305/31094801-eeefc503da474d57804746bba249904d.jpg"/></p><h2 id="articleHeader2">解决方案 </h2><p>在开始菜单中找到 Administrative Tools -&gt; Server Manager</p><p>然后选择 Features -&gt; Add Features</p><p>就会出现 Add Features Wizard -&gt; 选中 .NET Framework 3.5.1 Features -&gt; NEXT -&gt; NEXT</p><p><img alt="" height="649" src="http://images.cnitblog.com/blog/477275/201305/31095256-eb56c03e1cae4914bec464a5a9681b92.jpg" width="836"/></p><p>就会发现它已经自己在安装了</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201305/31095550-c29e8bdcb955419c9be42a047d81848b.jpg"/></p><p>并且默认的选择了Web Server IIS 和其它的一项, 这是安装之后的结果</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201305/31095643-c70e7d90d0e849b1a9ed338b40e776ff.jpg"/></p><p>下面是安装 SQL Server 2012 时出现的检查界面, 检查已经通过了！</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201305/31095752-11cad941200e4229b48db7e4775ea73c.jpg"/></p><p>OK 这样的话就不需要自己手动下载并安装 .NET Framework 3.5 了！</p>
+</div>]
+</body>
+</html>

@@ -1,0 +1,29 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<p>有时候需要从集合中取出特定的成员但是又不能执行遍历操作，这个时候就可以使用 GENERATE 函数来解决这个问题。</p><p>根据地区查询每年的销售额 -</p><pre><code><span style="font-family: Microsoft Yahei;"><span style="color: #0000ff;">SELECT</span><br/>
+NON EMPTY { <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Date</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Calendar</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Calendar Year</span><span style="color: #ff0000;">]</span>.MEMBERS <span style="color: #808080;">*</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Sales Amount</span><span style="color: #ff0000;">]</span>} <span style="color: #0000ff;">ON</span> <span style="color: #800000; font-weight: bold;">0</span>,<br/>
+NON EMPTY { <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Sales Territory</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Sales Territory Country</span><span style="color: #ff0000;">]</span>.MEMBERS } <span style="color: #0000ff;">ON</span> <span style="color: #800000; font-weight: bold;">1</span><br/>
+<span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Adventure Works</span><span style="color: #ff0000;">]</span></span></code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/02234200-fdf961969a8f4fc88537253e4cf3dd26.x-png"/></p><p>现在需要查询每年销售额最高的那个月在各个地区的销售情况。</p><pre><code><span style="font-family: Microsoft Yahei;"><span style="color: #0000ff;">WITH</span> <span style="color: #0000ff;">SET</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Best month per year</span><span style="color: #ff0000;">]</span> <span style="color: #0000ff;">AS</span><br/>
+Generate(<br/>
+<span style="color: #ff0000;">          [</span><span style="color: #ff0000;">Date</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Calendar</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Calendar Year</span><span style="color: #ff0000;">]</span>.MEMBERS,<br/>
+          TopCount(<br/>
+                    Descendants( <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Date</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Calendar</span><span style="color: #ff0000;">]</span>.CurrentMember,<br/>
+                    <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Date</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Calendar</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Month</span><span style="color: #ff0000;">]</span>,<br/>
+                     SELF<br/>
+                  ),<br/>
+<span style="color: #800000; font-weight: bold;">                  1</span>,<br/>
+<span style="color: #ff0000;">                  [</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Sales Amount</span><span style="color: #ff0000;">]</span><br/>
+                 )<br/>
+)<br/>
+<span style="color: #0000ff;">SELECT</span> NON EMPTY {<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Best month per year</span><span style="color: #ff0000;">]</span> <span style="color: #808080;">*</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Measures</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Sales Amount</span><span style="color: #ff0000;">]</span> } <span style="color: #0000ff;">ON</span> <span style="color: #800000; font-weight: bold;">0</span>,<br/>
+NON EMPTY {<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Sales Territory</span><span style="color: #ff0000;">]</span>.<span style="color: #ff0000;">[</span><span style="color: #ff0000;">Sales Territory Country</span><span style="color: #ff0000;">]</span>.MEMBERS} <span style="color: #0000ff;">ON</span> <span style="color: #800000; font-weight: bold;">1</span><br/>
+<span style="color: #0000ff;">FROM</span> <span style="color: #ff0000;">[</span><span style="color: #ff0000;">Adventure Works</span><span style="color: #ff0000;">]</span></span></code></pre><p>在这个查询中 Generate() 函数就相当于一个 For-each 循环，根据指定的集合去遍历集合中每一个成员，然后根据条件中判断情况抽取符合条件的成员形成一个新的集合。 由于使用了 TOPCOUNT 函数，因此根据参数 1 每一次循环只会返回一个成员，这些成员就最终形成了一个新的集合。</p><p>在 MDX 中实际上没有 FOR 循环的概念。在其它的编程语言中，循环遍历可能要基于数字之类的，但是在 MDX中，这种类似遍历的操作是基于集合的。</p>
+</div>]
+</body>
+</html>

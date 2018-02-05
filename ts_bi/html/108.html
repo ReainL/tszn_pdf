@@ -1,0 +1,79 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">Filtering Sets <br/></h2><p>部分定义参照 MSDN-</p><p>Filter 函数对指定集中的每个元组计算指定的逻辑表达式，如果逻辑表达式计算结果为 true，那么该函数将返回由指定集中的每个元组构成的集。如果所有元组的计算结果都不为 true，则返回一个空集。</p><p>Filter 函数的工作方式与 <a href="http://msdn.microsoft.com/zh-cn/library/ms145994.aspx">IIf</a> 函数类似，IIf 函数只返回两个选项中的一个，返回哪一个取决于 MDX 逻辑表达式的值; 而 Filter 函数返回符合指定搜索条件的元组集。实际上，Filter 函数是对集中的每个元组执行 IIf(Logical_Expression, Set_Expression.Current, NULL)，然后返回所得到的集。</p><h2 id="articleHeader2">示例一 – 查询所有产品的零售额和网售额</h2><pre><code>SELECT<br>
+{<br/>
+            ([Measures].[Reseller Sales Amount]),<br/>
+            ([Measures].[Internet Sales Amount])<br/>
+} ON COLUMNS,<br/>
+{[Product].[Product].[Product].Members} ON ROWS<br/>
+FROM [Step-by-Step];</br></code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/25172117-74badbfa43a940cdb06388aa87c457f7.png"/></p><h2 id="articleHeader3">示例二 – 查询所有网售额大于零售额的产品</h2><pre><code>SELECT<br/>
+{<br/>
+            ([Measures].[Reseller Sales Amount]),<br/>
+            ([Measures].[Internet Sales Amount])<br/>
+} ON COLUMNS,<br/>
+FILTER(<br/>
+                        {[Product].[Product].[Product].Members},<br/>
+                        [Measures].[Internet Sales Amount] &gt; [Measures].[Reseller Sales Amount]<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/25172147-19fe493f1200441d86b34a279b5078e6.png"/></p><p>上面的查询结果显示的是所有的产品，那么如果只想关心 accessory 和 clothing 子类产品的话，那么就需要修改条件表达式。</p><h2 id="articleHeader4">示例三 – 在 accessory 和 clothing 范围下查询所有 Internet Sales Amount 大于 Reseller Sales Amount 的产品</h2><pre><code>SELECT<br/>
+{<br/>
+            ([Measures].[Reseller Sales Amount]),<br/>
+            ([Measures].[Internet Sales Amount])<br/>
+} ON COLUMNS,<br/>
+FILTER(<br/>
+                        {[Product].[Product].[Product].Members},<br/>
+                        ([Measures].[Internet Sales Amount] &gt; [Measures].[Reseller Sales Amount])<br/>
+                        AND<br/>
+                        (<br/>
+                                    [Product].[Category].CurrentMember IS [Product].[Category].[Clothing]<br/>
+                                    OR<br/>
+                                    [Product].[Category].CurrentMember IS [Product].[Category].[Accessories]<br/>
+                        )<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/25172304-25f1713dca5843a1926da6bf086c5249.png"/></p><p>在这个查询中，很显然 Auto-Exists 又起了作用。在 Filter 函数中实际上查询的是 {[Product].[Product].[Product].Members} 中的产品成员，但是在条件表达式上能够直接对[Product].[Category].CurrentMember 进行判断，通过产品成员可以定位到产品成员所隶属的产品分类成员，这就是 Auto-Exists 的作用。</p><h2 id="articleHeader5">示例四 – 查询不在 accessory 和 clothing 范围下查询所有 Internet Sales Amount 大于 Reseller Sales Amount 的产品</h2><p>只需要对示例三中的代码做出小小的改动，加一个NOT 关键字 就构成了”既不在 Clothing 也不在 Accessories 类别下”的筛选条件。</p><pre><code>SELECT<br/>
+{<br/>
+            ([Measures].[Reseller Sales Amount]),<br/>
+            ([Measures].[Internet Sales Amount])<br/>
+} ON COLUMNS,<br/>
+FILTER(<br/>
+                        {[Product].[Product].[Product].Members},<br/>
+                        ([Measures].[Internet Sales Amount] &gt; [Measures].[Reseller Sales Amount])<br/>
+                        AND<br/>
+                        NOT (<br/>
+                                    [Product].[Category].CurrentMember IS [Product].[Category].[Clothing]<br/>
+                                    OR<br/>
+                                    [Product].[Category].CurrentMember IS [Product].[Category].[Accessories]<br/>
+                        )<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><h2 id="articleHeader6">NONEMPTY 函数 的用法</h2><p>在我的第四章学习笔记中提到了NON EMPTY 关键字 的使用，它可以过滤掉数据为空的那些记录。</p><p>NON EMPTY 关键字是对最终查询出来的结果进行过滤，清除为结果为空的记录，比如行上的一条记录所有列上的值均为空，那么这条记录将会被清除掉。</p><p>但是如果需要在形成最终查询结果之前，对参与的集合进行过滤的话，那么就应该使用 NONEMPTY 函数。</p><p>NonEmpty( {Set1} [,{Set2}])</p><h3 id="articleHeader7">示例一 先回顾下 NON EMPTY 关键字</h3><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+NON EMPTY {[Product].[Product].[Product].Members} ON ROWS<br/>
+FROM [Step-by-Step]</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/25223409-676d8cde1ce2441e9c1b363b5e0a7c90.png"/></p><p>NON EMPTY 的作用是在 结果查询出来之后，对ROWS 轴上的所有数据进行过滤，为空的数据将不会出现。</p><h3 id="articleHeader8">示例二 – 使用 NONEMPTY 函数</h3><pre><code>SELECT<br/>
+{([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+NonEmpty(<br/>
+{[Product].[Product].[Product].Members},<br/>
+{([Measures].[Reseller Sales Amount])}<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/25223513-3b8165a3313e45568fdd944c156dc98d.png"/></p><p>感觉上 NON EMPTY 关键字的使用和 NONEMPTY 函数的使用结果是一样的，但是实际上有很大的区别。在这个例子中，是首先对集合中 Product 层次结构下的成员进行过滤，过滤的对象是那些 Reseller Sales Amount 记录为空的 Product 成员，在集合这个层次上就开始过滤。</p><h3 id="articleHeader9"><b>示例三 – 使用 NONEMPTY 函数过滤轴</b></h3><pre><code>SELECT<br/>
+{([Measures].[Internet Sales Amount])<br/>
+,([Measures].[Reseller Sales Amount])} ON COLUMNS,<br/>
+NonEmpty(<br/>
+{[Product].[Product].[Product].Members},<br/>
+{([Measures].[Reseller Sales Amount])}<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/25223626-4386d113e0f7472ab0f3cc50de5a44ca.png"/></p><p>很显然，对[Product].[Product].[Product] 层次结构的成员开始过滤，过滤掉那些 Reseller Sales Amount 为空的成员，然后再和其它的成员形成元组和集合并返回。</p><p>如何证明？</p><h3 id="articleHeader10">示例四 – 使用NONEMPTY 函数</h3><pre><code>SELECT<br/>
+{([Measures].[Internet Sales Amount])} ON COLUMNS,<br/>
+NonEmpty(<br/>
+    {[Product].[Product].[Product].Members},<br/>
+    {([Measures].[Reseller Sales Amount])}<br/>
+) ON ROWS<br/>
+FROM [Step-by-Step];</code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201304/25223724-79e590d48ee247ad97c0053225fee251.png"/></p><p>对比示例三，查询的结果中 Internet Sales Amount 中还有为空的记录，说明这些记录是没有被过滤的，也说明了这些返回的记录，它们的 Reseller Sales Amount 是不为空的。</p>
+</div>]
+</body>
+</html>

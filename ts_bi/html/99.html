@@ -1,0 +1,187 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>SSAS Date 维度基本上在所有的 Cube 设计过程中都存在，很难见到没有时间维度的 OLAP 数据库。但是根据不同的项目需求， Date 维度的设计可能不大相同，所以在设计时间维度的时候需要搞清楚几个问题：</p><ol><li>你的业务涉及到的最低的细节级别是什么？比如按季度查看报表还是按月份，或者按周，或者再甚者按天。这个细节级别需要弄清楚，比如在一些销售数据统计，有的时候可能更多按季度或者按月来查看报表。但在有的监控一些机器运行数据的统计，可能会按照小时或者分钟来查看报表。</li><li>你的报表所需要时间显示的格式是什么，比如在英文系统中客户是希望显示月份的全称 January 或者简称 Jan 或者只喜欢看到数字1，2，3 到12 这种类型。包括显示具体天的时候是希望看到 10/1/2005 还是 2005/10/01 等格式。</li><li>还有没有一些特别的时间信息比如不仅仅需要自然年，而且还需要财年信息，以及其它是否是闰年，周末等这样的要求。</li><li>最重要的一点是客户喜欢按照哪一种或者哪几种层次结构来查看报表，比如第一层是年，通过年导航到月再导航到日期；还是说通过年直接导航到周再到具体的日期。</li></ol><h2 id="articleHeader2">时间维度模板</h2><p>弄清楚上面这几方面的内容之后，心里大概知道时间属性的范围了，细到哪一种级别，由哪些特别的字段需要添加都在这个设计阶段完成。</p><p>一般情况下，可以自己写一个创建时间日期的数据仓库维度表，在这个脚本里面可以根据需要自定义一些特别的日期格式。</p><pre><code class="lang-sql"><p>---------------------------------------------------------------------<br/>-- BIWORK DimDate and vDimDate Demo<br/>----------------------------------------------------------------------<br/>USE BIWORK_SSIS<br/>GO  <br/>SET NOCOUNT ON </p><p>IF OBJECT_ID('DimDate','U') IS NOT NULL<br/>DROP TABLE DimDate<br/>GO</p><p>CREATE TABLE DimDate<br/>(<br/>    DateKey INT PRIMARY KEY,<br/>    FullDate DATE NOT NULL,<br/>    [DateName] NVARCHAR(20),<br/>    DayNumberOfWeek TINYINT NOT NULL,<br/>    DayNameOfWeek NVARCHAR(10) NOT NULL,<br/>    DayNumberOfMonth TINYINT NOT NULL,<br/>    DayNumberOfYear SMALLINT NOT NULL,<br/>    IsWeekend BIT NOT NULL,<br/>    IsLeapYear BIT NOT NULL,<br/>    WeekNumberOfYear TINYINT NOT NULL,<br/>    EnglishMonthName NVARCHAR(10) NOT NULL,<br/>    MonthNumberOfYear TINYINT NOT NULL,<br/>    CalendarQuarter TINYINT NOT NULL,<br/>    CalendarSemester TINYINT NOT NULL,<br/>    CalendarYear SMALLINT NOT NULL, <br/>    FiscalQuarter TINYINT NOT NULL,<br/>    FiscalSemester TINYINT NOT NULL,<br/>    FiscalYear SMALLINT NOT NULL <br/>)</p><p>DECLARE @StartDate DATETIME<br/>DECLARE @EndDate DATETIME</p><p>SELECT @StartDate = '2005-01-01',<br/>       @EndDate = '2013-12-31'</p><p>WHILE (@StartDate &lt;= @EndDate)<br/>BEGIN<br/>    INSERT INTO DimDate <br/>    (<br/>        DateKey,<br/>        FullDate,<br/>        [DateName],<br/>        DayNumberOfWeek,<br/>        DayNameOfWeek,<br/>        DayNumberOfMonth,<br/>        DayNumberOfYear,<br/>        IsWeekend,<br/>        IsLeapYear,<br/>        WeekNumberOfYear,<br/>        EnglishMonthName, <br/>        MonthNumberOfYear,<br/>        CalendarQuarter,<br/>        CalendarSemester,<br/>        CalendarYear, <br/>        FiscalQuarter,<br/>        FiscalSemester,<br/>        FiscalYear <br/>    )<br/>    SELECT CAST(CONVERT(VARCHAR(8),@StartDate,112) AS INT) AS DateKey,<br/>           CONVERT(VARCHAR(10), @StartDate,20) AS FullDate,<br/>           CONVERT(VARCHAR(20), @StartDate,106) AS [DateName],<br/>           DATEPART(DW,@StartDate) AS DayNumberOfWeek,<br/>           DATENAME(DW,@StartDate) AS DayNameOfWeek,<br/>           DATENAME(DD,@StartDate) AS [DayOfMonth],<br/>           DATENAME(DY,@StartDate) AS [DayOfYear],<br/>           CASE WHEN DATEPART(DW,@StartDate) IN (1,7)  <br/>                    THEN 1<br/>                ELSE 0 <br/>           END AS IsWeekend,<br/>           CASE WHEN ((YEAR(@StartDate) % 4 = 0) AND (YEAR(@StartDate) % 100 != 0 OR YEAR(@StartDate) % 400 = 0))<br/>                    THEN 1<br/>                ELSE 0<br/>           END AS IsLeapYear,<br/>           DATEPART(WW,@StartDate) AS WeekNumberOfYear,<br/>           DATENAME(MM,@StartDate) AS EnglishMonthName,<br/>           DATEPART(MM,@StartDate) AS MonthNumberOfYear,<br/>           DATEPART(QQ,@StartDate) AS CalendarQuarter,<br/>           CASE WHEN DATEPART(MM,@StartDate) BETWEEN 1 AND 6<br/>                    THEN 1<br/>                ELSE 2<br/>           END AS CalendarSemester,<br/>           DATEPART(YY,@StartDate) AS CalendarYear, <br/>           CASE WHEN DATEPART(MM,@StartDate) BETWEEN 1 AND 6<br/>                     THEN DATEPART(QQ,@StartDate) + 2<br/>                ELSE DATEPART(QQ,@StartDate) - 2<br/>           END AS FiscalQuarter,<br/>           CASE WHEN DATEPART(MM,@StartDate) BETWEEN 1 AND 6<br/>                    THEN 2<br/>                ELSE 1<br/>           END AS FiscalSemester,<br/>           CASE WHEN DATEPART(MM,@StartDate) BETWEEN 1 AND 6<br/>                    THEN DATEPART(YY,@StartDate) <br/>                ELSE DATEPART(YY,@StartDate) + 1<br/>           END AS FiscalYear<br/>            <br/>    SET @StartDate = @StartDate + 1<br/>END<br/>GO</p><p>---------------------------------------------------------------------<br/>-- 加上视图的作用是因为在实际的项目开发中，SSAS 的数据源视图所有的表对象<br/>-- 应该都引用视图，这样当数据仓库中维度表或者事实表有小的改动就可以直接在<br/>-- 视图中修改，而可以避免修改 SSAS 项目。<br/>-- 这一点在 SSIS 开发中同样适用，所有在 SSIS 中配置的 SQL 语句都封装在存储<br/>-- 过程中，表封装在视图中。逻辑的修改直接体现在存储过程中，而不会修改 SSIS。<br/>----------------------------------------------------------------------<br/>IF OBJECT_ID('vDimDate','V') IS NOT NULL<br/>DROP VIEW vDimDate<br/>GO</p><p>CREATE VIEW vDimDate<br/>AS<br/>  -- 可以根据需要实现一些计算列，这些计算列通常也可以在 SSAS 视图中添加。<br/>SELECT DateKey AS 'DateKey',<br/>       FullDate AS 'FullDate',<br/>       [DateName] AS 'DateName',<br/>       CONVERT(VARCHAR(2),DayNumberOfMonth) + ' ' + EnglishMonthName + ' ' + CONVERT(CHAR(4), CalendarYear) AS 'FullDateName', -- 1 July 2005 <br/>       DayNumberOfWeek AS 'DayNumberOfWeek',<br/>       DayNameOfWeek AS 'DayNameOfWeek',<br/>       DayNumberOfMonth AS 'DayNumberOfMonth',<br/>       DayNumberOfYear AS 'DayNumberOfYear',<br/>       CASE WHEN IsWeekend = 1 THEN 'Weekend' <br/>            ELSE 'Weekday'<br/>       END AS 'WeekdayWeekend',<br/>       IsLeapYear AS 'IsLeapYear',<br/>       WeekNumberOfYear AS 'WeekNumberOfYear',<br/>       EnglishMonthName AS 'EnglishMonthName',<br/>       EnglishMonthName + ' ' + CONVERT(CHAR(4),CalendarYear) AS 'MonthName',  -- July 2005<br/>       CalendarYear * 100 + MonthNumberOfYear AS 'MonthKey', -- 200507<br/>       MonthNumberOfYear AS 'MonthNumberOfYear',<br/>       CalendarQuarter AS 'CalendarQuarter',<br/>       CalendarSemester AS 'CalendarSemester',<br/>       CalendarYear AS 'CalendarYear',  <br/>       CalendarYear * 100 + CalendarQuarter AS 'CalendarQuarterKey',  -- 200503<br/>       'CY ' + CONVERT(CHAR(4),CalendarYear) AS 'CalendarYearName', -- CY 2005<br/>       'CY ' + CONVERT(CHAR(4),CalendarYear) <br/>             + ' Qtr ' <br/>             + CONVERT(CHAR(1), CalendarQuarter) AS 'CalendarQuarterName', -- CY 2005 Qtr 3  <br/>       FiscalQuarter AS 'FiscalQuarter',<br/>       FiscalSemester AS 'FiscalSemester',<br/>       FiscalYear AS 'FiscalYear', <br/>       FiscalYear * 100 + FiscalQuarter AS 'FiscalQuarterKey', -- 200601<br/>       'FY ' + CONVERT(CHAR(4), FiscalYear) AS 'FiscalYearName',  -- FY 2006<br/>       'FY ' + CONVERT(Char(4), FiscalYear) + ' Qtr ' + Convert(Char(1), FiscalQuarter) AS 'FiscalQuarterName' -- FY 2006 Qtr 1<br/>FROM DimDate<br/>GO<br/></p></code></pre><h2 id="articleHeader3">解析 SSAS 中时间维度属性</h2><p>在我的这个示例中，财年是以微软的财年为例子的。比如2008年7月是自然月，但是财年就被称为 2009财年的1月，它是从每年的7月开始算的。 下面的这幅图主要是展示了各个字段上时间日期的格式是以及字段类型等。并且在后面设计维度的时候，我们往往选择 Key 会考虑使用整形数据字段，但是在 Name Column 的时候就会使用具体的描述内容。 Attribute Type 后面也能看得到，它的主要作用是为具体的时间日期字段指定日期属性。日期属性的指定能够让 SSAS Cube 在内部聚合的时候知道某个字段的含义，这个字段是描述日期，还是年还是月。在 MDX 的时间相关的层级导航或者查询中，比如说 YTD() 函数的使用就跟设置属性为 Year 相关的维度属性相关，可以参考我的这篇 <a href="http://www.cnblogs.com/biwork/p/3460475.html"><u><font color="#0066cc">MDX笔记</font></u></a>。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174650-11cda3ef9d294b9a807dd533c8f2fa88.png"/></p><h3 id="articleHeader4">创建时间维度</h3><p>新建一个 SSAS 项目并创建好数据源和数据源视图，数据源视图中就是上面创建的视图。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174728-c79abbd8185a4a9799fc5a1061d4741f.png"/></p><p>创建一个简单的时间维度，选择 vDimDate，并在 Key Column 中选择 DateKey, Name Column 选择 FullDateName。实际上，这里就一个属性，但是这个属性是由两部分组成的，一个是 KEY 一个是 NAME。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174745-32332b08167243d9929d7294d4c55ac7.png"/></p><p>然后选择其它的相应的属性，这里面基本上都是选择的数值类型的属性，因为我们一会还要修改它们，为他们配置相应的 Name Column - 提供信息标签。我们同时为这些属性选择好相应的 Attribute Type，如下图所示。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174751-7143a0941d364cf591892090877a22f7.png"/></p><p>修改维度名称 Date ，那么保存后就可以看到一个维度和它的维度属性了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174756-2dce878962d84ea487e93e49daa963e5.png"/></p><p>Date 维度它的类型会自动设置为 Time 的，不是 Time 类型的维度在 MDX 的查询中有很多时间函数可能就无法使用了。并且在 SSAS Cube 的处理过程中，就不会把这个维度当作特殊的时间维度去考虑，因此这里会自动设置为 Time 类型。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174801-ad9582d8a9f343a3b5c75c99f83263ee.png"/></p><p>这样的结构就是一个维度和它下面的维度属性，如果仅这样部署到 SSAS 分析服务中，我们将看到的是一堆数字 KEY 表示的信息，那么这些数据就失去了"信息"的意义。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174806-cf0f63672995415d8aebda06863fc906.png"/></p><p>因此我们需要按照这个图来修改每一个属性，为它们指定相应的 NAME Column，这样相当于为这个数字添上了一个标签。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174650-11cda3ef9d294b9a807dd533c8f2fa88.png"/></p><p>如上图所示，下图中的 CalendarYear 这个属性，它的 Key Column 就是 CalendarYear ，它的 Attribute Type 是 Year, 它的 Name Column 是 Calendar Year Name。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174812-ee88bcdb1ba74490868fde5e627d891c.png"/></p><p>按照上面的配置修改完维度属性之后，也将名字改的简单一些。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174818-c5655138e0424f94b616422908200466.png"/></p><p>部署之后可以看到每一个维度属性的 Name Column 展示出来的信息了，并且注意在 SSAS 中有这样的一个概念 - 维度中的属性实际上指的属性层次结构，每一个属性层次结构都包含两层。第一层是以 ALL 为代表的成员，第二层是以各个属性值表示的成员。ALL 表示的就是对下面所有属性的一个聚合，在和度量值结合起来看就会很容易理解的。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174827-dd96c771ba944ed0bb7af07cf68cbfb0.png"/></p><p>维度其实就是属性和层次结构组成的，但是除了上面的属性层次结构之外，还包括下面的用户自定义层次结构。那么这种主要是根据用户的需求来决定的，比如用户通常会根据年来聚合，或者再细看季度方面的数据，然后再是月或者天。因此下面创建两个日期自定义层次结构，一个是自然年度的，一个是财年年度的层次结构。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174835-8d21005cd1e948b09ded5ee6b698f337.png"/></p><p>默认情况下，各个属性是和维度主 KEY 关联的，那么这样在层次结构关系中可能每次的上下次层次聚合都需要通过 Date Key 来进行关联，比如说不能通过 Month 来直接找到季度方面的成员，也不能通过年来找到具体季度的成员，因此需要对属性之间的关系做出一定的调整，提高 SSAS 处理属性聚合时的效率。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174842-279d40ad908e48d1b46c6997b6bfde0d.png"/></p><p>修改完了之后的属性关系就更加合理一些。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174849-d784cd939bc446fd880db1d4d2fc81fa.png"/></p><p>创建好的自定义属性层级关系，它的导航结构和上图的设计是一致的，注意到它也有一个 ALL 级别。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174857-93a07ad85fb549a2af1633276c54d489.png"/></p><p>实际上刚才我们设计的这些个属性我们之前也一直强调过，是由两部分组成的，一部分是自身的 KEY，另一部分是 NAME 来增强了对它们自身的解释。下面描述了这些属性的 NAME 匹配关系。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174904-8903e778256141a89c2f293c3e24be87.png"/></p><p>这个是财年层次结构的展开效果。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174911-7238ed431fbb4daca47300f428d25f85.png"/></p><p>财年 KEY 和 NAME 的对应关系。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174917-c8e58f9f6fad47a5846fe20729bf8763.png"/></p><h3 id="articleHeader5">时间属性的排序</h3><p>但是在自然的属性层次结构中，我们看到 MONTH NAME 下面的成员顺序不正确，一月份应该是 January ，但是 April 却排到最前面去了。虽然这里的成员顺序不会影响我们数据分析，但是人们更加希望能够按照约定俗成的方式更自然的方式来展现，这样更符合我们的习惯。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174924-ada93acf53744019b6db7ab0d9fe90bb.png"/></p><p>因此需要编辑属性关系，我们之前偷偷加了一个属性 Month Number Of Year 但是一直没有用到，但是在这里就可以用上了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174932-b6d49e5c7ccf40f097a1261d83b8139c.png"/></p><p>绑定的属性关系中，可以看到 Month Name 又将 Month Number Of Year 这个属性关联成它自己的一种属性了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174940-1e1205d0784d4532aaf15312e92eef81.png"/></p><p>Month Name 排序之前按照 Key 排序，Key 就是 Month Name 自身的英语月的排序，那么 April 肯定是显示在第一个的位置了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174946-4a245718a8f34cca806c36d9d83c0d1d.png"/></p><p>注意这里要使用 Attribute Key 排序，选择 Month Number Of Year。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174952-97b573bb8a7d4ba7bda7e0342b22eb34.png"/></p><p>由于 Month Number Of Year 这个属性只是用来做排序用的，因此这个属性层次结构是没有必要展示在客户端的，也没有必要作为一个属性出现，因此禁用浏览，也禁用变成层次结构。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22174958-349d3f391847406cb8cdc2ed5a10b07c.png"/></p><p>部署完毕之后就可以看到一个正常的月份顺序了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22175004-46686edf433048ffa8caa3537429837c.png"/></p><p>下面是对应关系。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22175010-080ab029275d41aca5323b6389bb7c1b.png"/></p><p>如果按照 Attribute Name 排序会出现什么问题？</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22175015-2118db9404de409fbf0794fb50199dcc.png"/></p><p>可以看这幅图，如果按照 Attribute Name 来排序的话，就会看到顺序会变成 1，10，11，12 然后才是 2，3，4 ...9 。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201312/22175021-4021402dcfa94690baa193f79203bedf.png"/></p><h2 id="articleHeader6">PS 另外一种命名格式</h2><pre><code class="lang-sql">/****** OBJECT:  TABLE DBO.DIM_DATE    SCRIPT DATE: 10/30/2015 10:29:33 PM ******/<br>
+SET ANSI_NULLS ON<br>
+GO<br>
+<br>
+SET QUOTED_IDENTIFIER ON<br>
+GO<br>
+<br>
+SET NOCOUNT ON<br>
+GO<br>
+IF OBJECT_ID('DIM_DATE') IS NOT NULL<br>
+DROP TABLE DIM_DATE <br>
+GO <br>
+CREATE TABLE DIM_DATE(<br>
+	DATE_KEY INT PRIMARY KEY,<br>
+	FULL_DATE DATE NOT NULL,<br>
+	DATE_NAME NVARCHAR(20) NULL,<br>
+	FULL_DATE_NAME NVARCHAR(20) NULL, <br>
+	DAY_NUMBER_OF_WEEK TINYINT NOT NULL,<br>
+	DAY_NAME_OF_WEEK NVARCHAR(10) NOT NULL,<br>
+	DAY_NUMBER_OF_MONTH TINYINT NOT NULL,<br>
+	DAY_NUMBER_OF_YEAR SMALLINT NOT NULL,<br>
+	IS_WEEKEND BIT NOT NULL,<br>
+	WEEK_DAY_WEEK_END NVARCHAR(10),<br>
+	IS_LEAP_YEAR BIT NOT NULL,<br>
+	WEEK_NUMBER_OF_YEAR TINYINT NOT NULL,<br>
+	ENGLISH_MONTH_NAME NVARCHAR(10) NOT NULL,<br>
+	MONTH_NUMBER_OF_YEAR TINYINT NOT NULL,<br>
+	MONTH_NAME NVARCHAR(20) NULL,<br>
+	MONTH_KEY INT,<br>
+	CALENDAR_QUARTER TINYINT NOT NULL,<br>
+	CALENDAR_SEMESTER TINYINT NOT NULL,<br>
+	CALENDAR_YEAR SMALLINT NOT NULL,<br>
+	CALENDAR_YEAR_NAME NVARCHAR(20),<br>
+	CALENDAR_QUARTER_KEY INT,<br>
+	CALENDAR_QUARTER_NAME NVARCHAR(20)<br>
+)<br>
+GO<br>
+<br>
+DECLARE @STARTDATE DATETIME<br>
+DECLARE @ENDDATE DATETIME<br>
+<br>
+SELECT @STARTDATE = '2010-01-01',<br>
+       @ENDDATE = '2020-12-31'<br>
+<br>
+WHILE (@STARTDATE &lt;= @ENDDATE)<br>
+BEGIN<br>
+    INSERT INTO DIM_DATE <br>
+    (<br>
+        DATE_KEY,<br>
+        FULL_DATE,<br>
+        DATE_NAME,<br>
+		FULL_DATE_NAME,<br>
+        DAY_NUMBER_OF_WEEK,  <br>
+        DAY_NAME_OF_WEEK,<br>
+        DAY_NUMBER_OF_MONTH,<br>
+        DAY_NUMBER_OF_YEAR,<br>
+        IS_WEEKEND,<br>
+		WEEK_DAY_WEEK_END, <br>
+        IS_LEAP_YEAR,<br>
+        WEEK_NUMBER_OF_YEAR,<br>
+        ENGLISH_MONTH_NAME, <br>
+        MONTH_NUMBER_OF_YEAR,<br>
+		MONTH_NAME, <br>
+		MONTH_KEY,  <br>
+        CALENDAR_QUARTER,<br>
+        CALENDAR_SEMESTER,<br>
+        CALENDAR_YEAR,<br>
+		CALENDAR_YEAR_NAME,<br>
+		CALENDAR_QUARTER_KEY,<br>
+		CALENDAR_QUARTER_NAME<br>
+    )<br>
+    SELECT CAST(CONVERT(VARCHAR(8),@STARTDATE,112) AS INT) AS DATE_KEY,<br>
+           CONVERT(VARCHAR(10), @STARTDATE,20) AS FULL_DATE,<br>
+           CONVERT(VARCHAR(20), @STARTDATE,106) AS DATE_NAME,<br>
+		   CONVERT(VARCHAR(2),DATENAME(DD,@STARTDATE)) + ' ' + DATENAME(MM,@STARTDATE) + ' ' + CONVERT(CHAR(4), DATEPART(YY,@STARTDATE)) AS 'FULLDATENAME', -- 1 JULY 2005 <br>
+           DATEPART(DW,@STARTDATE) AS DAY_NUMBER_OF_WEEK,<br>
+<br>
+           DATENAME(DW,@STARTDATE) AS DAY_NAME_OF_WEEK,<br>
+           DATENAME(DD,@STARTDATE) AS DAY_NUMBER_OF_MONTH,<br>
+           DATENAME(DY,@STARTDATE) AS [DAYOFYEAR],<br>
+           CASE WHEN DATEPART(DW,@STARTDATE) IN (1,7)  <br>
+                    THEN 1<br>
+                ELSE 0 <br>
+           END AS IS_WEEKEND,<br>
+		   CASE WHEN DATEPART(DW,@STARTDATE) IN (1,7) THEN 'WEEKEND' <br>
+				ELSE 'WEEKDAY'<br>
+		   END AS 'WEEK_DAY_WEEK_END',<br>
+		    <br>
+           CASE WHEN ((YEAR(@STARTDATE) % 4 = 0) AND (YEAR(@STARTDATE) % 100 != 0 OR YEAR(@STARTDATE) % 400 = 0))<br>
+                    THEN 1<br>
+                ELSE 0<br>
+           END AS IS_LEAP_YEAR,<br>
+           DATEPART(WW,@STARTDATE) AS WEEK_NUMBER_OF_YEAR,<br>
+           DATENAME(MM,@STARTDATE) AS ENGLISH_MONTH_NAME,<br>
+           DATEPART(MM,@STARTDATE) AS MONTH_NUMBER_OF_YEAR,<br>
+		   DATENAME(MM,@STARTDATE) + ' ' + CONVERT(CHAR(4),DATEPART(YY,@STARTDATE)) AS 'MONTH_NAME',  -- JULY 2005<br>
+<br>
+		   DATEPART(YY,@STARTDATE) * 100 + DATEPART(MM,@STARTDATE) AS 'MONTH_KEY', -- 200507 <br>
+           DATEPART(QQ,@STARTDATE) AS CALENDAR_QUARTER,<br>
+           CASE WHEN DATEPART(MM,@STARTDATE) BETWEEN 1 AND 6<br>
+                    THEN 1<br>
+                ELSE 2<br>
+           END AS CALENDAR_SEMESTER,<br>
+           DATEPART(YY,@STARTDATE) AS CALENDAR_YEAR,<br>
+		   'CY ' + CONVERT(CHAR(4),DATEPART(YY,@STARTDATE)) AS 'CALENDAR_YEAR_NAME', -- CY 2005 <br>
+           DATEPART(YY,@STARTDATE)  * 100 + DATEPART(QQ,@STARTDATE) AS 'CALENDAR_QUARTER_KEY',  -- 200503 <br>
+		   'CY ' + CONVERT(CHAR(4),DATEPART(YY,@STARTDATE)) <br>
+				 + ' QTR ' <br>
+				 + CONVERT(CHAR(1), DATEPART(QQ,@STARTDATE)) AS 'CALENDAR_QUARTER_NAME'-- CY 2005 QTR 3  <br>
+    SET @STARTDATE = @STARTDATE + 1<br>
+END<br>
+GO<br/></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></code></pre><h3 id="articleHeader7">DIM_TIME <br/></h3><pre><code class="lang-sql">IF OBJECT_ID('DIM_TIME') IS NOT NULL<br>
+DROP TABLE DIM_TIME <br>
+GO<br>
+<br>
+CREATE TABLE DIM_TIME(<br>
+ TIME_KEY INT PRIMARY KEY IDENTITY(0,1),<br>
+ TIME_NAME CHAR(8),<br>
+ HOUR_NAME CHAR(2),<br>
+ MILITARY_HOUR CHAR(2),<br>
+ MINUTE_NAME CHAR(2),<br>
+ SECOND_NAME CHAR(2),<br>
+ AM_PM CHAR(2),<br>
+ STANDARD_TIME CHAR(11)<br>
+)<br>
+<br>
+DECLARE @TIME DATETIME<br>
+<br>
+SET @TIME = CONVERT(VARCHAR,'12:00:00 AM',108)<br>
+<br>
+TRUNCATE TABLE DIM_TIME<br>
+<br>
+WHILE @TIME &lt;= '11:59:59 PM'<br>
+ BEGIN<br>
+ INSERT INTO DBO.DIM_TIME(TIME_NAME, HOUR_NAME, MILITARY_HOUR, MINUTE_NAME, SECOND_NAME, AM_PM)<br>
+ SELECT CONVERT(VARCHAR,@TIME,108) TIME_NAME<br>
+ , CASE <br>
+ WHEN DATEPART(HOUR,@TIME) &gt; 12 THEN DATEPART(HOUR,@TIME) - 12<br>
+ ELSE DATEPART(HOUR,@TIME) <br/>
+ END AS HOUR_NAME<br/>
+ , CAST(SUBSTRING(CONVERT(VARCHAR,@TIME,108),1,2) AS INT) MILITARY_HOUR<br/>
+ , DATEPART(MINUTE,@TIME) MINUTE_NAME<br/>
+ , DATEPART(SECOND,@TIME) SECOND_NAME<br/>
+ , CASE <br/>
+ WHEN DATEPART(HOUR,@TIME) &gt;= 12 THEN 'PM'<br/>
+ ELSE 'AM'<br/>
+ END AS AM_PM<br/>
+<br/>
+ SELECT @TIME = DATEADD(SECOND,1,@TIME)<br/>
+ END<br/>
+<br/>
+UPDATE DIM_TIME<br/>
+SET HOUR_NAME = '0' + HOUR_NAME<br/>
+WHERE LEN(HOUR_NAME) = 1<br/>
+<br/>
+UPDATE DIM_TIME<br/>
+SET MINUTE_NAME = '0' + MINUTE_NAME<br/>
+WHERE LEN(MINUTE_NAME) = 1<br/>
+<br/>
+UPDATE DIM_TIME<br/>
+SET SECOND_NAME = '0' + SECOND_NAME<br/>
+WHERE LEN(SECOND_NAME) = 1<br/>
+<br/>
+UPDATE DIM_TIME<br/>
+SET MILITARY_HOUR = '0' + MILITARY_HOUR<br/>
+WHERE LEN(MILITARY_HOUR) = 1<br/>
+<br/>
+UPDATE DIM_TIME<br/>
+SET STANDARD_TIME = HOUR_NAME + ':' + MINUTE_NAME + ':' + SECOND_NAME + ' ' + AM_PM<br/>
+WHERE STANDARD_TIME IS NULL<br/>
+AND HOUR_NAME &lt;&gt; '00'<br/>
+<br/>
+UPDATE DIM_TIME<br/>
+SET STANDARD_TIME = '12' + ':' + MINUTE_NAME + ':' + SECOND_NAME + ' ' + AM_PM<br/>
+WHERE HOUR_NAME = '00'<br/>
+GO<br/></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></br></code></pre>
+</div>]
+</body>
+</html>

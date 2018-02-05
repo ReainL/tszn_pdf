@@ -1,0 +1,79 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<p>之前项目中经常有文件的读取或者输出操作,其中最重要的就是在处理文件输入/输出之前验证文件的路径是否存在,如果不存在就输出错误.</p><pre><code><span style="font-size: 12px;"><span style="color: #008000;">/*</span><span style="color: #008000;"><br/>
+   Microsoft SQL Server Integration Services Script Task<br/>
+   Write scripts using Microsoft Visual C# 2008.<br/>
+   The ScriptMain is the entry point class of the script.<br/>
+</span><span style="color: #008000;">*/</span><br/>
+ <br/>
+<span style="color: #0000ff;">using</span><span style="color: #000000;"> System;<br/>
+</span><span style="color: #0000ff;">using</span><span style="color: #000000;"> System.Data;<br/>
+</span><span style="color: #0000ff;">using</span><span style="color: #000000;"> Microsoft.SqlServer.Dts.Runtime;<br/>
+</span><span style="color: #0000ff;">using</span><span style="color: #000000;"> System.Windows.Forms;<br/>
+</span><span style="color: #0000ff;">using</span><span style="color: #000000;"> System.IO;<br/>
+ <br/>
+</span><span style="color: #0000ff;">namespace</span><span style="color: #000000;"> ST_TEST.csproj<br/>
+{<br/>
+    [System.AddIn.AddIn(</span><span style="color: #800000;">"</span><span style="color: #800000;">ScriptMain</span><span style="color: #800000;">"</span>, Version = <span style="color: #800000;">"</span><span style="color: #800000;">1.0</span><span style="color: #800000;">"</span>, Publisher = <span style="color: #800000;">""</span>, Description = <span style="color: #800000;">""</span><span style="color: #000000;">)]<br/>
+    </span><span style="color: #0000ff;">public</span> <span style="color: #0000ff;">partial</span> <span style="color: #0000ff;">class</span><span style="color: #000000;"> ScriptMain : Microsoft.SqlServer.Dts.Tasks.ScriptTask.VSTARTScriptObjectModelBase<br/>
+    {<br/>
+ <br/>
+        </span><span style="color: #0000ff;">#region</span> VSTA generated code<br/>
+        <span style="color: #0000ff;">enum</span><span style="color: #000000;"> ScriptResults<br/>
+        {<br/>
+            Success </span>=<span style="color: #000000;"> Microsoft.SqlServer.Dts.Runtime.DTSExecResult.Success,<br/>
+            Failure </span>=<span style="color: #000000;"> Microsoft.SqlServer.Dts.Runtime.DTSExecResult.Failure<br/>
+        };<br/>
+        </span><span style="color: #0000ff;">#endregion</span><br/>
+         <br/>
+        <span style="color: #0000ff;">public</span> <span style="color: #0000ff;">void</span><span style="color: #000000;"> Main()<br/>
+        {<br/>
+            </span><span style="color: #0000ff;">string</span><span style="color: #000000;"> sFilePath;<br/>
+            </span><span style="color: #0000ff;">string</span><span style="color: #000000;"> sPackagename;<br/>
+ <br/>
+            </span><span style="color: #008000;">//</span><span style="color: #008000;"> Get the package name from SSIS Variables</span><br/>
+            sPackagename = Dts.Variables[<span style="color: #800000;">"</span><span style="color: #800000;">System::PackageName</span><span style="color: #800000;">"</span><span style="color: #000000;">].Value.ToString();<br/>
+            </span><span style="color: #008000;">//</span><span style="color: #008000;"> Get the file path from SSIS Variables</span><br/>
+            sFilePath = Dts.Variables[<span style="color: #800000;">"</span><span style="color: #800000;">User::IncomingFile</span><span style="color: #800000;">"</span><span style="color: #000000;">].Value.ToString();<br/>
+ <br/>
+            </span><span style="color: #0000ff;">try</span><span style="color: #000000;"><br/>
+            {<br/>
+                </span><span style="color: #008000;">//</span><span style="color: #008000;"> Check for existence of file</span><br/>
+                <span style="color: #0000ff;">if</span> ( !<span style="color: #000000;">File.Exists( sFilePath ) )<br/>
+                {<br/>
+                    Dts.Events.FireError( </span><span style="color: #800080;">0</span><span style="color: #000000;">,<br/>
+                                          sPackagename,<br/>
+                                          </span><span style="color: #800000;">"</span><span style="color: #800000;">File at file path: </span><span style="color: #800000;">"</span> + sFilePath + <span style="color: #800000;">"</span><span style="color: #800000;"> does not exist</span><span style="color: #800000;">"</span><span style="color: #000000;">,<br/>
+                                          </span><span style="color: #800000;">""</span><span style="color: #000000;">,<br/>
+                                          </span><span style="color: #800080;">0</span><span style="color: #000000;"> );<br/>
+                }<br/>
+            }<br/>
+            </span><span style="color: #0000ff;">catch</span><span style="color: #000000;"> ( System.Exception e )<br/>
+            {<br/>
+                Dts.Events.FireError(</span><span style="color: #800080;">0</span><span style="color: #000000;">,<br/>
+                                      sPackagename,<br/>
+                                      </span><span style="color: #800000;">"</span><span style="color: #800000;">Exception occurred check for file at file path: </span><span style="color: #800000;">"</span> + sFilePath + <span style="color: #800000;">"</span><span style="color: #800000;"> with error: </span><span style="color: #800000;">"</span> +<span style="color: #000000;"> e.Message.ToString(),<br/>
+                                      </span><span style="color: #800000;">""</span><span style="color: #000000;">,<br/>
+                                      </span><span style="color: #800080;">0</span><span style="color: #000000;">);<br/>
+            }<br/>
+        }<br/>
+    }<br/>
+}</span></span></code></pre><p>上面的 <span style="color: rgb(128, 0, 0);">User::IncomingFile <span style="color: rgb(0, 0, 0);">在传入Script Component之前通过变量表达式就已经将文件夹路径, 文件名路径拼写在一起形成一个完整的文件路径, 所以进来后直接去验证和处理.</span></span></p><p><span style="color: rgb(128, 0, 0);"><span style="color: rgb(0, 0, 0);">有时如果在输出文件之时,文件的输入目录和文件夹地址并不是固定的,而是通过变量来维护的. 在文件输出之前需要检查下文件输出</span></span>的的目录和文件夹是否存在, 是否能够构成一个有效的输出路径,因此需要这样来检查下.</p><pre><code><span style="font-size: 12px;"><span style="color: #0000ff;">string</span> directory = Dts.Variables[<span style="color: #800000;">"</span><span style="color: #800000;">User::OutgoingDirectory</span><span style="color: #800000;">"</span><span style="color: #000000;">].Value.ToString();<br/>
+</span><span style="color: #0000ff;">string</span> folder = Dts.Variables[<span style="color: #800000;">"</span><span style="color: #800000;">User::OutgoingFolder</span><span style="color: #800000;">"</span><span style="color: #000000;">].Value.ToString();<br/>
+</span><span style="color: #0000ff;">string</span> folderPath =<span style="color: #000000;"> Path.Combine(directory,folder);<br/>
+ <br/>
+</span><span style="color: #0000ff;">if</span> (!<span style="color: #000000;">Directory.Exists(folderPath))<br/>
+{<br/>
+   Dts.Events.FireError(</span><span style="color: #800080;">0</span>,sPackageName,<span style="color: #800000;">"</span><span style="color: #800000;">Cannot find this folder path </span><span style="color: #800000;">"</span>+folderPath+<span style="color: #800000;">"</span> <span style="color: #800000;">"</span>,<span style="color: #800000;">""</span>,<span style="color: #800080;">0</span><span style="color: #000000;">);<br/>
+   </span><span style="color: #0000ff;">return</span><span style="color: #000000;">;<br/>
+}<br/>
+</span></span></code></pre>
+</div>]
+</body>
+</html>

@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>SSRS 小技巧系列专门用来记录 SSRS 报表开发过程中常用的小技巧 -</p><p>效果图 - 0% 的标签数据不需要显示出来。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/241750046076613.png"/></p><p>效果图 - 正常的效果。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/241759296708551.png"/></p><p> </p><h2 id="articleHeader2">解决方法</h2><p>使用 IIF 条件判断，如果计算值为 0 的话，那么使用 NOTHING。 NOTHING 的作用非常多，如果 SSRS 报表做的多的话，应该用过 NOTHING 来完成一些特殊效果。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/241751127328634.png"/></p><p>效果出来了，但是不正确，因为所有其它的状态都隐藏不见了。原因是因为我们的判断是强加在了聚合值本身，正确的做法应该是对标签数据进行判断。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/241754241387393.png"/></p><p>选中标签来编辑它的属性。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/241755393416951.png"/></p><p>用同样的表达式进行判断。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/241756033102361.png"/></p><p>最终效果，各个状态照旧显示，但是 0%的值不显示。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201404/241759176707617.png"/><br/></p>
+</div>]
+</body>
+</html>

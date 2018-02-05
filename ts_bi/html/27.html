@@ -1,0 +1,82 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>记得笔者在 2006年左右刚开始学习 SQL Server 2000 的时候，遇到一个面试题就是行转列，列转行的操作，当时写了很长时间的 SQL 语句最终还是以失败而告终。后来即使能写出来，也是磕磕碰碰的，虽然很能锻炼 SQL 功底，每次都要挣扎一番，溺水的感觉。记得SQL Server 2005 以后就有了 PIVOT 和 UNPIVOT 这两个函数，可以非常方便的实现行转列和列传行的操作，就不再那么挣扎了。后来，在一个 08 项目中，有一位新的女同事在改一个 ETL，发现 SSIS 包中有一个PIVOT 控件不知道怎么用就叫我帮忙。虽然我觉得花点时间还是可以搞定的，但是为了赶回家看一场球赛，找了一个不靠谱的接口就扔下她一个人给跑了。因为项目应该很急，每个人压力其实都很大，不记得是当天晚上就要交付还是第二天要交付。现在想想，很内疚也非常败人品，因为平时大家伙还都比较信任我，但是关键时刻跑了，确实有点不太负责任。今天正好整理到这一部分的笔记就想到了这个疙瘩，山东的那位妹子如果看到了，说声对不起吧！</p><p>SSIS 笔记整理到这几个地方，就来总结一下 PIVOT 的使用，如果之前不会用的，看了这篇文章就可以明白了。</p><h2 id="articleHeader2">测试代码</h2><pre><code>IF OBJECT_ID('T040_PRODUCT_SALES') IS NOT NULL<br/>
+DROP TABLE<span> T040_PRODUCT_SALES<br/>
+GO<br/>
+CREATE TABLE<span> T040_PRODUCT_SALES<br/>
+(<br/>
+   ID INT IDENTITY(1,1<span>),<br/>
+   ProductName VARCHAR(20<span>),<br/>
+   SaleMonth INT<span>,<br/>
+   SalesCount INT<span><br/>
+)<br/>
+ <br/>
+-- Inserting test data<br/>
+INSERT INTO T040_PRODUCT_SALES VALUES<span><br/>
+('Bicycle',1,1<span>),<br/>
+('Shoes',2,2<span>),<br/>
+('Clothes',3,3<span>),<br/>
+('Books',4,4<span>),<br/>
+('Medicine',5,5<span>),<br/>
+('Drinks',6,6<span>),<br/>
+('Shoes',7,7<span>),<br/>
+('Books',1,2<span>),<br/>
+('Bicycle',1,3<span>),<br/>
+('Medicine',1,4<span>),<br/>
+('Clothes',1,5<span>),<br/>
+('Mobile Phone',1,6<span>),<br/>
+('Books',1,7<span>),<br/>
+('Medicine',1,8<span>),<br/>
+('Shoes',1,9<span>),<br/>
+('Bicycle',2,10<span>)<br/>
+SELECT<span> ProductName,<br/>
+    SaleMonth,<br/>
+    SUM(SalesCount) AS<span> SalesCount<br/>
+FROM<span> T040_PRODUCT_SALES<br/>
+GROUP BY<span> ProductName,<br/>
+   SaleMonth<br/>
+ORDER BY<span> ProductName,<br/>
+      SaleMonth</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171646238797446.png"/></p><p>我们需要实现的效果是按产品名称，1月，2月，3月，4月，5月，6月 这七个列来显示 SalesCount 的总数。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171646321912040.png"/></p><p>怎么来实现这种行列转换效果，只要把下面这个点就理解清楚，照着写就可以实现。</p><pre><code>/****<br/>
+SELECT 非透视列,<br/>
+             [透视列 1] AS '列名1',<br/>
+             [透视列 2] AS '列名2',<br/>
+             [透视列 3] AS '列名3'<br/>
+FROM (<br/>
+        -- 源数据<br/>
+        SELECT 非透视列,<br/>
+               透视列值的来源列,<br/>
+               需要聚合的值<br/>
+        FROM 表<br/>
+     )AS 别名<br/>
+PIVOT<br/>
+     (<br/>
+        SUM(需要聚合的值)<br/>
+        FOR 透视列值的来源列 IN ([透视列 1]，[透视列 2]，[透视列 3])<br/>
+     )AS 别名<br/>
+****/</code></pre><p>对照上面的语法，我们弄清楚这些对应关系：</p><ul><li>非透视列 - 一般是第一列，把效果想出来，ProductName 就是位于第一列，它是非透视列。</li><li>透视列 - 就是需要由列变为行的那些列，哪些行中的值需要作为列来显示？ 1月 - 6月。</li><li>透视列值的来源列 - 就是 SaleMonth，这列包含了 1月 - 6月的值。</li><li>需要聚合的值 - 就是 SalesCount。</li></ul><p>把这些需求理解了，就直接按照上面的这个语法就可以实现了，没有一点点多余的代码。</p><pre><code>SELECT<span> ProductName,<br/>
+    ISNULL([1],0) AS '1'<span>,<br/>
+    ISNULL([2],0) AS '2'<span>,<br/>
+    ISNULL([3],0) AS '3'<span>,<br/>
+    ISNULL([4],0) AS '4'<span>,<br/>
+    ISNULL([5],0) AS '5'<span>,<br/>
+    ISNULL([6],0) AS '6'<br/>
+FROM<span>(<br/>
+ SELECT<span> ProductName,<br/>
+     SaleMonth,<br/>
+     SalesCount<br/>
+ FROM<span> T040_PRODUCT_SALES<br/>
+)AS<span> Sales<br/>
+PIVOT<br/>
+(<br/>
+ SUM<span>(SalesCount)<br/>
+ FOR SaleMonth IN([1],[2],[3],[4],[5],[6]<span>)<br/>
+)AS PIVOTBL</span></span></span></span></span></span></span></span></span></span></span></span></code></pre><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171649097541138.png"/></p><h2 id="articleHeader3">SSIS 中 Pivot 的实现</h2><p>在数据流中添加一个 OLE DB Source 并配置源测试表。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171650071138280.png"/></p><p>添加一个 Pivot 控件。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171650180357643.png"/></p><p>对 Pivot 的配置</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171650493479276.png"/></p><p>Pivot Key - 透视列。透视列中的每一个值（去重之后）将会形成一个新的列。</p><p>Set Key - 非透视列，需要和透视列一起显示的聚合列。</p><p>Pivot Value - Pivot Key 和 Set Key 一起关联的结果值。</p><p>之所以要选择 Ignore un-matched pivot key values and report them after DataFlow execution 是因为:</p><p>Pivot 转换控件是一个静态的状态控件，它需要清楚的知道在 Pivot Key 中有哪些确定的值，它需要基于这些值来创建相应的输出列。勾选中它并执行一次包之后，就可以在 Progress/中看到唯一的 Pivot Key 列表，我们在设计的阶段就可以通过这些列表上的值来确定最终我们需要创建的列。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171651459574750.png"/></p><p>比如，确定了只需要 1月份 - 7月份的作为新的输出列，将这些只拷贝到指定的位置中，根据这些透视列来创建物理表中的透视列。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171652014882838.png"/></p><p>下面是创建之后的列的名称。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171652242547650.png"/></p><p>这样整个配置就完成了。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171652329723185.png"/></p><p>执行的时候查看一下数据，基本上反映出了行转列的结构变化。这不过这些数据本身上看上去有一些重复，且没有聚合。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171652421137593.png"/></p><p>因此我们应该在查询结果先把需要聚合好的内容聚合好，这样在 PIVOT 转换控件中就直接进行行，列转换而不是转换在聚合，这样效率更高一些。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171653017383965.png"/></p><p>按照 ProductName 和销售月份实现了对数据的行列转换，数据信息的易读性显而易见。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171653117223014.png"/></p><p>当然也可以看看 Show Advanced Editor 中的内容。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171653217854507.png"/></p><p>在这里可以看到 Pivot 转换控件之前有 3 个数据源列，在经过 Pivot 转换之后，其 Output Columns 变成 8 列向下输出。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201411/171653301755842.png"/><br/><br/></p>
+</div>]
+</body>
+</html>

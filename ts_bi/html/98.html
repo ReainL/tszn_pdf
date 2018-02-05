@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>在SSDT中部署一个 SSAS 项目到本地服务器上出现错误。</p><p> <img alt="" src="http://images.cnitblog.com/blog/477275/201306/20220414-96b930809dd448a79d9779749bf6ea68.x-png"/></p><p>You cannot deploy the model because the localhost deployment server is not running in multidimensional mode。</p><p>错误原因是因为我在本地安装 SQL Server 2012 的时候只选择安装了 Tabular Mode，而这个Demo项目是多维数据集项目，在 SQL Server 2012 中被称之为 Multidimensional Mode。</p><h2 id="articleHeader2">查看 SSAS 项目</h2><p>有的时候我们部署的项目并不一定是在本地服务器示例上，有可能部署在远程服务器示例，那么如何知道远程服务器上的 SSAS 服务安装了哪些模式？</p><p>非常简单的做法就是连接到远程服务器分析服务然后参照此图 - 显示了不同 SSAS 模型的实例。</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201306/20220440-16667378aad44fddab993bc2cad1992f.x-png"/></p><p>第一种表示是 Multidimensional Mode 多维和数据挖掘模式 ，简单理解就是我们在 SQL Server 2008 / 2008 R2 上使用的 SSAS 的模型，可以支持 MOLAP, HOLAP 和 ROLAP 存储以及数据挖掘模型的多维数据库。</p><p>第二种显示的是 Tabular Mode，在 SQL Server 2012 中新推出的一个 SSAS 解决方案，是完完全全的一个新产品，是基于内存存储或 DirectoryQuery 存储的表格模型。</p><p>第三种显示的是 SSAS 实例是作为 PowerPivot for SharePoint 部署的一部分安装。</p><p>每一种模式之间是互斥的，不能在表格模型下运行多维数据库模型的 SSAS 数据库，就像我开头提到的这个问题，在 Tabular Mode 下我是无法将一个 Multidimensional Mode 的项目部署成功的。</p><p>并且建议也不要尝试将几种不同的模型安装到同一个服务器实例中，因为我的尝试没有成功！</p><p>在之后的尝试中，我也试图在同一台服务器中将这些不同的模型分别安装到不同的服务器实例，发现也不能成功，也有可能是人品问题!</p><p><img alt="" src="http://images.cnitblog.com/blog/477275/201306/20220452-62dd4d5e755640f5b07e3c40fcf668d8.x-png"/></p><p>错误信息 - Rule "Same architecture installation" failed。</p><p>有一个很重要的原因就是在第一次安装完 SQL Server 2012 之后系统目录中会出现 Microsoft SQL Server 2008 的部分内容，等再次安装 SQL Server 2012 的时候它认为两者之间产生了某种冲突，因此验证失败！</p><p>还好我的电脑中有不同的虚拟机，因此也不打算继续浪费时间尝试下去。并且有一个很重要的前提就是除非你的电脑配置非常高，否则也不要将多个 SSAS 服务安装在同一个系统中，开销会非常大。</p>
+</div>]
+</body>
+</html>

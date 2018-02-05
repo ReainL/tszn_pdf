@@ -1,0 +1,102 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h3 id="articleHeader1" style="margin-left: 0px;">开篇介绍 </h3><p>在 ETL 项目中，很多时候情况下是需要通过编程的手段来解决一些问题的。比如说在控制流中对参数的验证，文件路径的验证，文件的移动拷贝归档等等，包括在数据流中需要通过编程处理一些比如特殊不规则文件的读取，复杂的分支流程处理，包括对数据库的访问等等。在控制流中我们可以使用到 Script Task，同样的在数据流中我们也有 Script Component 来实现自定义的脚本编程 Script。自 2008 开始，SSIS Script 组件不仅仅支持 VB 语法，也同样开始支持 C# 语法，即我们可以在 Script Component 中来使用 C#.NET。</p><h3 id="articleHeader2" style="margin-left: 0px;">Script Component 初步体验</h3><p>Script Component 是一个比较特殊的控件，它即可以在数据流中担当 Source 的角色，也可以担当 Destination，更多的时候它只起到 Transformation 的作用。我们下面通过一个小例子，先简单认识一下 Script Component，之后再单独来介绍各个具体的功能。</p><p>这里是 5 行测试数据，这是数据流中 OLE DB Source 中关联到的数据（请自行添加数据流任务）。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251418536061237.png"/></p><p style="margin-left: auto;">自行创建包以及数据流，OLE DB Source 数据源，并拖放一个 Script Component 进来，默认选择 Transformation。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251418599027647.png"/></p><p style="margin-left: auto;">在 Script Component 和 Audit 之间添加一个 Data Viewer。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251419044026872.png"/></p><p style="margin-left: auto;">在 Input Columns 中只选择 ProductName，这里一旦选择，那么 ProductName 在数据流中的 Script Component 是直接可以访问到的。在下面可以选择 ReadOnly 只读或者 ReadWrite，即在 Script Component 中是 ProductName 是只读的还是可以读写赋值的。这里选择只读状态。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251419096371239.png"/></p><p style="margin-left: auto;">回到 Script 编辑脚本，第一次打开的时候会稍微慢一些，之后再使用打开会比较快一些。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251419157465705.png"/></p><p style="margin-left: auto;"><span style="color: rgb(255, 0, 0);"><strong>与控制流的 Script Task 不同，在数据流中 Script Component 如果想访问 Windows Form 是需要自己动手引入这个命名空间的。</strong></span></p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251419243878199.png"/></p><p style="margin-left: auto;">下面的代码中要着重看三个方法：</p><ul><li>PreExecute() - Script Component 所在当前数据流执行之前被调用的方法，完成一些初始化操作。包括可以在这里面完成一些数据库连接等等（.NET 编程）</li><li>PostExecute() - Script Component 所在当前数据流执行之后被调用的方法，完成一些释放资源的操作。在这个例子中，比较简单不做复杂的处理。</li><li>Input0_ProcessInputRow() - 上游数据源每输入一行方法执行一次，并且在这个方法中是可以读取到行的每一列的，只需要在上面的配置中像 ProductName 被选中即可。本案例中，我们的源数据有 5 行，因此此方法会被调用 5 次。</li></ul><pre><code><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> This method is called once, before rows begin to be processed in the data flow.<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> You can remove this method if you don\'t need to do anything here.<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;/summary&gt;</span><br/>
+    <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">public</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">override</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">void</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> PreExecute()<br/>
+    {<br/>
+        </span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">base</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">.PreExecute();<br/>
+        </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">/*</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"><br/>
+         * Add your code here<br/>
+         </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">*/</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"><br/>
+        MessageBox.Show(</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">Call PreExecute()</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">);<br/>
+    }<br/>
+<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> This method is called after all the rows have passed through this component.<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> You can delete this method if you don\'t need to do anything here.<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;/summary&gt;</span><br/>
+    <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">public</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">override</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">void</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> PostExecute()<br/>
+    {<br/>
+        </span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">base</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">.PostExecute();<br/>
+        </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">/*</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"><br/>
+         * Add your code here<br/>
+         </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">*/</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"><br/>
+        MessageBox.Show(</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">Call Post()</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">);<br/>
+    }<br/>
+<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> This method is called once for every row that passes through the component from Input0.<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> Example of reading a value from a column in the the row:<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> string zipCode = Row.ZipCode<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> Example of writing a value to a column in the row:<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> Row.ZipCode = zipCode<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;/summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;param name="Row"&gt;</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">The row that is currently passing through the component</span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;/param&gt;</span><br/>
+    <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">public</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">override</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">void</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> Input0_ProcessInputRow(Input0Buffer Row)<br/>
+    {<br/>
+        </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">/*</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"><br/>
+         * Add your code here<br/>
+         </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">*/</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"><br/>
+        MessageBox.Show(Row.ProductName);<br/>
+    }</span></code></pre><p style="margin-left: auto;">执行包，数据流已经开始执行。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251419296064039.png"/></p><p style="margin-left: auto;"> 点击进去之后，发现 OLE_SRC_PRODUCT_SALES 并没有被执行，但是可以看到弹出对话框中来自于 PreExecute() 的代码被执行了。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251419347932420.png"/></p><p style="margin-left: auto;">等 PreExecute() 方法被执行完毕之后，OLE_SRC_PRODUCT_SALES 才开始执行。在执行 SC_COUNT_ROWS 这个 Script Component 过程中，调用了 Input0_ProcessInputRow() 这个方法，并且通过 Row.ProductName 直接访问到了 ProductName 这一列。</p><p style="margin-left: auto;">多说一句，Input0_ProcessInputRow(Input0Buffer Row) 参数 Row 的生命周期就是这个方法调用的时候创建，调用结束的时候结束。<strong><span style="color: rgb(255, 0, 0);">Row 是每一个进入 Script Component 组件行的实例。</span></strong></p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251419404188201.png"/></p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251419462931440.png"/></p><p style="margin-left: auto;">待 SC_COUNT_ROWS 所有行进入处理并往下一起输出的时候，可以在 Data Viewer 中清晰的看到这 5 行数据，并且可以看到 Audit 控件也处于执行状态。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251419520594179.png"/></p><p style="margin-left: auto;">但是要注意到，PostExecute() 方法的调用确实整个数据流组件执行结束之后才被调用的，并且这个方法也只执行了一次！</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251419577627703.png"/></p><p style="margin-left: auto;">因此，可以通过这个简单的例子了解到在默认 Transformation 形式下：</p><ul><li>三个默认方法的执行先后顺序，何时开始执行，执行次数，以及各自的区别。</li><li>如何访问数据源中的列，Row 对象的生命周期。</li><li>Input0_ProcessInputRow() 方法的执行与输入行的关系。</li></ul><p style="margin-left: auto;">了解到上面几个特点之后，我们可以很容易的实现一个数据流输入条数的计数功能。（虽然我们有 Row Count，但是我们也可以通过 Script Component 实现，并且可以大胆的猜测 Row Count 的实现方式和这里的 Script Component 是一样的，只不过不需要初始化那么多东西）。</p><h3 id="articleHeader3" style="margin-left: 0px;">使用 Script Component 完成一个行计数器</h3><p style="margin-left: auto;">创建一个 int 类型的变量，并配置在 Script Component 可读写的列表中。</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251420034027714.png"/></p><p style="margin-left: auto;">主要代码如下：</p><p style="margin-left: auto;">PreExecute 方法主要完成计数变量的初始化。</p><p style="margin-left: auto;">ProcessInputRow 方法每进入一行，执行一次计数。</p><p style="margin-left: auto;">PostExecute 方法等整个数据流执行完毕的时候调用显示一下计数结果。</p><pre><code>  <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">int</span> count = <span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">0</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">;<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> This method is called once, before rows begin to be processed in the data flow.<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> You can remove this method if you don\'t need to do anything here.<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;/summary&gt;</span><br/>
+    <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">public</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">override</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">void</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> PreExecute()<br/>
+    {<br/>
+        </span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">base</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">.PreExecute();<br/>
+        </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">/*</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"><br/>
+         * Add your code here<br/>
+         </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">*/</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"><br/>
+        count </span>= <span style="color: rgb(128, 0, 128); line-height: 1.5 !important;">0</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">;<br/>
+    }<br/>
+<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> This method is called after all the rows have passed through this component.<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> You can delete this method if you don\'t need to do anything here.<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;/summary&gt;</span><br/>
+    <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">public</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">override</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">void</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> PostExecute()<br/>
+    {<br/>
+        </span><span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">base</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">.PostExecute();<br/>
+        </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">/*</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"><br/>
+         * Add your code here<br/>
+         </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">*/</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"><br/>
+        Variables.PVROWCOUNT </span>=<span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> count;<br/>
+        MessageBox.Show(</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">Total Count - </span><span style="color: rgb(128, 0, 0); line-height: 1.5 !important;">"</span>+<span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">Variables.PVROWCOUNT);<br/>
+    }<br/>
+<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> This method is called once for every row that passes through the component from Input0.<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> Example of reading a value from a column in the the row:<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> string zipCode = Row.ZipCode<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> Example of writing a value to a column in the row:<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"> Row.ZipCode = zipCode<br/>
+    </span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;/summary&gt;</span><br/>
+    <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">///</span> <span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;param name="Row"&gt;</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">The row that is currently passing through the component</span><span style="color: rgb(128, 128, 128); line-height: 1.5 !important;">&lt;/param&gt;</span><br/>
+    <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">public</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">override</span> <span style="color: rgb(0, 0, 255); line-height: 1.5 !important;">void</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"> Input0_ProcessInputRow(Input0Buffer Row)<br/>
+    {<br/>
+        </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">/*</span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;"><br/>
+         * Add your code here<br/>
+         </span><span style="color: rgb(0, 128, 0); line-height: 1.5 !important;">*/</span><span style="color: rgb(0, 0, 0); line-height: 1.5 !important;"><br/>
+        count</span>++<span style="color: rgb(0, 0, 0); line-height: 1.5 !important;">;<br/>
+    }</span></code></pre><p style="margin-left: auto;">结果显示如下：</p><p style="margin-left: auto;"><img alt="" src="http://images.cnitblog.com/blog/477275/201411/251420130593564.png"/></p>
+</div>]
+</body>
+</html>

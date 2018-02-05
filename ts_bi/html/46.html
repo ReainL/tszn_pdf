@@ -1,0 +1,12 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+[<div class="message-content editor-style">
+<h2 id="articleHeader1">开篇介绍</h2><p>SSIS 中处理文件，一般在描述输出平面文件格式的时候通常会出现以下几种选项:</p><ol><li>Delimited - 默认输出列使用逗号分隔，也可以选择其它的诸如 | ，或者 Tab 等。</li><li>Fixed Width - 列定长输出，固定长度，但不换行。</li><li>Fixed Width with row delimiters - 其实就相当于 Ragged right，只不过换行符 CR+LF 的位置不同，这个是新的一列显示一个换行符。</li><li>Ragged right - 和上面的这个格式区别就是 CR+LF 换行符处于最后一列的位置。</li></ol><p><img alt="" src="http://images.cnitblog.com/i/477275/201408/112134322649739.png"/></p><p>哪几种比较常用？</p><p>按我个人经验，常用的顺序应该是 -</p><p>Delimited -&gt; Ragged right -&gt; Fixed width with row delimiters -&gt; Fixed width，其中 Fixed width 至今没有使用过。</p><h2 id="articleHeader2">Delimited</h2><p>每一列输出的时候默认使用 ，号分隔，最后的一列跟换行符分隔。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201408/112141365141284.png"/></p><p><img alt="" src="http://images.cnitblog.com/i/477275/201408/112141447024717.png"/></p><p>输出文件的样式，并查看所有符号显示回车加换行 CR+LF -</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201408/112143509057939.png"/></p><h2 id="articleHeader3">Ragged right</h2><p>列定长输出，因此列之间是没有分隔符的。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201408/112212169526680.png"/></p><p>只有在最后一列的时候有回车换行符。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201408/112212261709230.png"/></p><p>实际输出效果中最后一列跟回车换行符，还要注意的就是当输出的实际列的宽度只有5的时候，比如 False 长度为5，但是在定长的时候如果考虑输出列标题，是需要参考列标题的长度的，否则输出报错。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201408/112212314525176.png"/></p><h2 id="articleHeader4">Fixed width with row delimiters</h2><p>它和 Ragged Right 表现差不多，只不过最后一列是额外添加的一列，专门用来标识回车换行。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201408/112217584059462.png"/></p><p><img alt="" src="http://images.cnitblog.com/i/477275/201408/112218064838097.png"/></p><h2 id="articleHeader5">Fixed width</h2><p>定长但是没有默认换行，这个效果就是所有数据一行展开。</p><p><img alt="" src="http://images.cnitblog.com/i/477275/201408/112219242176213.png"/></p><h2 id="articleHeader6">总结</h2><p>在我第一个 BI 项目中就有大量的这种类型的需求，比如像上面的两种定长输出和换行的位置，在有些输出文件格式中就有明确的要求和说明。通过理解以上几种文件输出格式，再以后碰到类似的需求的时候就很容易弄明白彼此之间的区别了。<br/></p>
+</div>]
+</body>
+</html>
